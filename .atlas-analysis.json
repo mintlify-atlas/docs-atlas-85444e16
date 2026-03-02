@@ -1,0 +1,119 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "TorchGeo",
+  "projectDescription": "PyTorch domain library for geospatial data with datasets, samplers, transforms, and pre-trained models.",
+  "theme": "aspen",
+  "primaryColor": "#2E8B57",
+  "lightColor": "#90EE90",
+  "darkColor": "#1B5E20",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/geospatial-datasets",
+              "concepts/benchmark-datasets",
+              "concepts/samplers",
+              "concepts/transforms",
+              "concepts/datamodules"
+            ]
+          },
+          {
+            "group": "Training",
+            "pages": [
+              "training/overview",
+              "training/trainers",
+              "training/lightning-cli",
+              "training/pretrained-weights",
+              "training/custom-trainers"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/geospatial-datasets",
+              "tutorials/benchmark-datasets",
+              "tutorials/custom-raster-dataset",
+              "tutorials/pretrained-weights",
+              "tutorials/indices",
+              "tutorials/transforms"
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": [
+              "community/contributing",
+              "community/changelog"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Datasets",
+            "pages": [
+              "api/datasets/overview",
+              "api/datasets/geospatial",
+              "api/datasets/non-geospatial"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/overview",
+              "api/models/pretrained-weights",
+              "api/models/architectures"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "api/datamodules",
+              "api/samplers",
+              "api/transforms",
+              "api/trainers",
+              "api/losses"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "100+ geospatial and benchmark datasets with automatic download",
+    "Pre-trained models with multispectral support (Sentinel-2, Landsat, etc.)",
+    "Geospatial samplers for coordinate-based sampling",
+    "Lightning trainers for classification, segmentation, detection, and self-supervised learning",
+    "Kornia-based transforms for geospatial data augmentation",
+    "Reproducible datamodules with standardized train-val-test splits"
+  ],
+  "publicApiSurface": [
+    "torchgeo.datasets.GeoDataset",
+    "torchgeo.datasets.RasterDataset",
+    "torchgeo.datasets.VectorDataset",
+    "torchgeo.datasets.NonGeoDataset",
+    "torchgeo.samplers.RandomGeoSampler",
+    "torchgeo.samplers.GridGeoSampler",
+    "torchgeo.models.ResNet18_Weights",
+    "torchgeo.models.ViTSmall16_Weights",
+    "torchgeo.trainers.ClassificationTask",
+    "torchgeo.trainers.SemanticSegmentationTask",
+    "torchgeo.trainers.ObjectDetectionTask",
+    "torchgeo.datamodules.InriaAerialImageLabelingDataModule",
+    "torchgeo.transforms.indices",
+    "torchgeo.main (CLI)"
+  ]
+}
