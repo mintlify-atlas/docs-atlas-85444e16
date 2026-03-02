@@ -1,0 +1,310 @@
+---
+title: Training overview
+description: Learn how to train models with TorchGeo
+---
+
+TorchGeo provides Lightning-based trainers that simplify model training for geospatial tasks. This page introduces the training workflow and key concepts.
+
+## Why Lightning?
+
+TorchGeo uses PyTorch Lightning to provide:
+
+- **Less boilerplate**: No need to write training loops
+- **Best practices**: Automatic optimization, gradient clipping, etc.
+- **Reproducibility**: Standardized experiment structure
+- **Scalability**: Easy multi-GPU and distributed training
+
+<Note>
+If you're new to Lightning, check out the [Lightning documentation](https://lightning.ai/docs/pytorch/stable/) for a comprehensive introduction.
+</Note>
+
+## Training workflow
+
+The typical TorchGeo training workflow:
+
+<Steps>
+  <Step title="Choose a DataModule">
+    Select a pre-configured DataModule for your dataset:
+    
+    ```python
+    from torchgeo.datamodules import InriaAerialImageLabelingDataModule
+    
+    datamodule = InriaAerialImageLabelingDataModule(
+        root="data",
+        batch_size=8,
+        num_workers=4
+    )
+    ```
+  </Step>
+  
+  <Step title="Configure a Task">
+    Choose a task matching your problem (classification, segmentation, etc.):
+    
+    ```python
+    from torchgeo.trainers import SemanticSegmentationTask
+    
+    task = SemanticSegmentationTask(
+        model="unet",
+        backbone="resnet50",
+        weights=True,  # Use ImageNet weights
+        in_channels=3,
+        num_classes=2,
+        loss="bce"
+    )
+    ```
+  </Step>
+  
+  <Step title="Create a Trainer">
+    Configure the Lightning Trainer:
+    
+    ```python
+    from lightning.pytorch import Trainer
+    
+    trainer = Trainer(
+        max_epochs=50,
+        accelerator="auto",
+        devices=1
+    )
+    ```
+  </Step>
+  
+  <Step title="Train the model">
+    Start training:
+    
+    ```python
+    trainer.fit(model=task, datamodule=datamodule)
+    ```
+  </Step>
+  
+  <Step title="Evaluate and test">
+    Evaluate on test set:
+    
+    ```python
+    trainer.test(model=task, datamodule=datamodule, ckpt_path="best")
+    ```
+  </Step>
+</Steps>
+
+## Complete example
+
+Here's a full training script for building segmentation:
+
+```python
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from torchgeo.datamodules import InriaAerialImageLabelingDataModule
+from torchgeo.trainers import SemanticSegmentationTask
+
+# Configure data
+datamodule = InriaAerialImageLabelingDataModule(
+    root="./data",
+    batch_size=8,
+    num_workers=6,
+    download=True
+)
+
+# Configure model
+task = SemanticSegmentationTask(
+    model="unet",
+    backbone="resnet50",
+    weights=True,
+    in_channels=3,
+    num_classes=2,
+    loss="bce",
+    lr=1e-3
+)
+
+# Configure training
+checkpoint_callback = ModelCheckpoint(
+    monitor="val_loss",
+    mode="min",
+    save_top_k=3
+)
+
+early_stop_callback = EarlyStopping(
+    monitor="val_loss",
+    patience=10,
+    mode="min"
+)
+
+trainer = Trainer(
+    max_epochs=50,
+    accelerator="auto",
+    devices=1,
+    callbacks=[checkpoint_callback, early_stop_callback]
+)
+
+# Train
+trainer.fit(model=task, datamodule=datamodule)
+
+# Test
+trainer.test(model=task, datamodule=datamodule, ckpt_path="best")
+```
+
+## Task types
+
+TorchGeo provides tasks for common remote sensing problems:
+
+<CardGroup cols={2}>
+  <Card title="Classification" icon="image" href="/training/trainers#classification">
+    Single-label and multi-label classification
+  </Card>
+  <Card title="Segmentation" icon="vector-square" href="/training/trainers#segmentation">
+    Semantic and instance segmentation
+  </Card>
+  <Card title="Detection" icon="location-dot" href="/training/trainers#detection">
+    Object detection with bounding boxes
+  </Card>
+  <Card title="Change Detection" icon="arrows-left-right" href="/training/trainers#change-detection">
+    Detect changes between image pairs
+  </Card>
+  <Card title="Regression" icon="chart-line" href="/training/trainers#regression">
+    Pixel-wise and image-level regression
+  </Card>
+  <Card title="Self-Supervised" icon="brain" href="/training/trainers#self-supervised">
+    BYOL, MoCo, SimCLR for pre-training
+  </Card>
+</CardGroup>
+
+## Using pre-trained weights
+
+TorchGeo provides pre-trained weights for multispectral sensors:
+
+```python
+from torchgeo.trainers import ClassificationTask
+from torchgeo.models import ResNet18_Weights
+
+task = ClassificationTask(
+    model="resnet18",
+    weights=ResNet18_Weights.SENTINEL2_ALL_MOCO,  # Sentinel-2 weights
+    in_channels=13,
+    num_classes=10,
+    loss="ce"
+)
+```
+
+See the [Pre-trained Weights](/training/pretrained-weights) guide for more details.
+
+## Callbacks and logging
+
+### Model checkpointing
+
+Save the best models during training:
+
+```python
+from lightning.pytorch.callbacks import ModelCheckpoint
+
+checkpoint = ModelCheckpoint(
+    monitor="val_accuracy",  # Metric to monitor
+    mode="max",              # Maximize accuracy
+    save_top_k=3,            # Save top 3 models
+    filename="{epoch}-{val_accuracy:.2f}"
+)
+
+trainer = Trainer(callbacks=[checkpoint])
+```
+
+### Early stopping
+
+Stop training when validation metric stops improving:
+
+```python
+from lightning.pytorch.callbacks import EarlyStopping
+
+early_stop = EarlyStopping(
+    monitor="val_loss",
+    patience=10,  # Stop after 10 epochs without improvement
+    mode="min"
+)
+
+trainer = Trainer(callbacks=[early_stop])
+```
+
+### Logging
+
+Log metrics to TensorBoard, Weights & Biases, etc:
+
+```python
+from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
+
+# TensorBoard
+tb_logger = TensorBoardLogger("logs/", name="my_experiment")
+
+# Weights & Biases
+wandb_logger = WandbLogger(project="torchgeo", name="my_run")
+
+trainer = Trainer(logger=[tb_logger, wandb_logger])
+```
+
+## Multi-GPU training
+
+Scale to multiple GPUs:
+
+```python
+# Single machine, multiple GPUs
+trainer = Trainer(
+    accelerator="gpu",
+    devices=4,  # Use 4 GPUs
+    strategy="ddp"  # Distributed Data Parallel
+)
+
+# Multiple machines
+trainer = Trainer(
+    accelerator="gpu",
+    devices=4,
+    num_nodes=2,  # 2 machines
+    strategy="ddp"
+)
+```
+
+## Mixed precision training
+
+Use 16-bit precision for faster training:
+
+```python
+trainer = Trainer(
+    precision="16-mixed",  # Mixed precision
+    max_epochs=50
+)
+```
+
+<Tip>
+Mixed precision can speed up training by 2-3x with minimal accuracy loss.
+</Tip>
+
+## Hyperparameter tuning
+
+Common hyperparameters to tune:
+
+- **Learning rate**: Start with `1e-3`, adjust based on loss curves
+- **Batch size**: As large as GPU memory allows
+- **Model architecture**: Try different backbones
+- **Loss function**: Match to your task
+- **Augmentations**: Balance between regularization and data fidelity
+
+```python
+task = SemanticSegmentationTask(
+    model="unet",
+    backbone="resnet50",  # Try: resnet18, resnet101, efficientnet
+    lr=1e-3,              # Try: 1e-4, 1e-2
+    loss="ce",            # Try: focal, jaccard, dice
+    # ...
+)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Trainers" icon="graduation-cap" href="/training/trainers">
+    Detailed trainer documentation
+  </Card>
+  <Card title="Lightning CLI" icon="terminal" href="/training/lightning-cli">
+    Train models from the command line
+  </Card>
+  <Card title="Pre-trained Weights" icon="download" href="/training/pretrained-weights">
+    Use multispectral pre-trained models
+  </Card>
+  <Card title="Custom Trainers" icon="wrench" href="/training/custom-trainers">
+    Create your own task classes
+  </Card>
+</CardGroup>

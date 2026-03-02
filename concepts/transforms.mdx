@@ -1,0 +1,280 @@
+---
+title: Transforms
+description: Data augmentation and preprocessing for geospatial data
+---
+
+TorchGeo provides specialized transforms for geospatial data, including spectral indices, color transforms, and GPU-accelerated augmentations using Kornia.
+
+## Overview
+
+TorchGeo's transform modules include:
+
+- **Indices**: Spectral indices like NDVI, NDWI, NBR
+- **Color**: Color space conversions and jitter
+- **Spatial**: Geometric augmentations (rotation, flip, crop)
+- **Temporal**: Time-series specific augmentations
+
+<Note>
+TorchGeo uses Kornia for GPU-accelerated transforms, enabling fast augmentation during training.
+</Note>
+
+## Spectral indices
+
+Compute vegetation, water, and other spectral indices:
+
+```python
+from torchgeo.transforms import indices
+
+# Compute NDVI (Normalized Difference Vegetation Index)
+ndvi_transform = indices.AppendNDVI(index_nir=3, index_red=2)
+
+# Apply to a sample
+sample = {"image": landsat_image}  # (C, H, W)
+sample = ndvi_transform(sample)
+# sample["image"] now has NDVI as an additional channel
+```
+
+Available indices:
+
+- `AppendNDVI`: Vegetation index
+- `AppendNDWI`: Water index  
+- `AppendNBR`: Burn ratio
+- `AppendNDSI`: Snow index
+- `AppendNDBI`: Built-up index
+- `AppendNDRE`: Red-edge index
+- `AppendGNDVI`: Green NDVI
+- `AppendGBNDVI`: Green-blue NDVI
+- `AppendGRNDVI`: Green-red NDVI
+- `AppendGCVI`: Green chlorophyll index
+
+### Band indices
+
+Different sensors have different band orderings:
+
+```python
+# Landsat 8/9 bands: Coastal, Blue, Green, Red, NIR, SWIR1, SWIR2
+landsat_ndvi = indices.AppendNDVI(
+    index_nir=4,  # NIR is band 5
+    index_red=3   # Red is band 4
+)
+
+# Sentinel-2 bands: Blue, Green, Red, NIR, ...
+sentinel_ndvi = indices.AppendNDVI(
+    index_nir=3,  # NIR is band 8
+    index_red=2   # Red is band 4
+)
+```
+
+## Kornia augmentations
+
+TorchGeo leverages Kornia for GPU-accelerated transforms:
+
+```python
+import kornia.augmentation as K
+from kornia.augmentation import AugmentationSequential
+
+# Define augmentations
+augmentations = AugmentationSequential(
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    K.RandomRotation(degrees=90, p=0.5),
+    K.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, p=0.5),
+    data_keys=["image", "mask"]  # Apply to both image and mask
+)
+
+# Apply augmentations
+sample = {"image": image, "mask": mask}
+augmented = augmentations(sample["image"], sample["mask"])
+```
+
+### GPU vs CPU
+
+For best performance, apply augmentations on GPU:
+
+```python
+from lightning.pytorch import LightningModule
+import kornia.augmentation as K
+
+class MyModel(LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.train_aug = K.AugmentationSequential(
+            K.RandomHorizontalFlip(p=0.5),
+            K.RandomRotation(degrees=90, p=0.5),
+            data_keys=["image", "mask"]
+        )
+    
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        """Apply augmentations on GPU after batch transfer."""
+        if self.trainer.training:
+            # Data is already on GPU here
+            batch["image"], batch["mask"] = self.train_aug(
+                batch["image"],
+                batch["mask"]
+            )
+        return batch
+```
+
+<Warning>
+**Mask handling**: Kornia requires masks to have a channel dimension. Convert integer masks to float, augment, then convert back:
+
+```python
+# Before augmentation
+mask = mask.float().unsqueeze(1)  # (B, 1, H, W)
+
+# After augmentation  
+mask = mask.squeeze(1).long()  # (B, H, W)
+```
+</Warning>
+
+## Common augmentations
+
+### Geometric transforms
+
+```python
+import kornia.augmentation as K
+
+transforms = AugmentationSequential(
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    K.RandomRotation(degrees=90, p=0.5),
+    K.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0)),
+    data_keys=["image", "mask"]
+)
+```
+
+### Photometric transforms
+
+```python
+transforms = AugmentationSequential(
+    K.ColorJitter(
+        brightness=0.2,
+        contrast=0.2,
+        saturation=0.2,
+        hue=0.1,
+        p=0.5
+    ),
+    K.RandomGaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0), p=0.3),
+    K.RandomGaussianNoise(mean=0.0, std=0.01, p=0.3),
+    data_keys=["image"]
+)
+```
+
+### Normalization
+
+```python
+from kornia.augmentation import Normalize
+
+# ImageNet stats (for RGB)
+normalize = Normalize(
+    mean=[0.485, 0.456, 0.406],
+    std=[0.229, 0.224, 0.225]
+)
+
+# Apply
+image = normalize(image)
+```
+
+## Using transforms in DataModules
+
+TorchGeo DataModules handle transforms automatically:
+
+```python
+from torchgeo.datamodules import InriaAerialImageLabelingDataModule
+import kornia.augmentation as K
+
+# Custom augmentations
+train_aug = AugmentationSequential(
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    data_keys=["image", "mask"]
+)
+
+datamodule = InriaAerialImageLabelingDataModule(
+    root="data",
+    batch_size=8,
+    num_workers=4,
+    aug=train_aug  # Apply during training
+)
+```
+
+## Complete example
+
+Here's a full example with custom transforms:
+
+```python
+from lightning.pytorch import LightningModule, Trainer
+from torchgeo.datamodules import EuroSATDataModule
+from torchgeo.trainers import ClassificationTask
+import kornia.augmentation as K
+from kornia.augmentation import AugmentationSequential
+
+# Define augmentations
+train_transforms = AugmentationSequential(
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    K.RandomRotation(degrees=90, p=0.5),
+    K.ColorJitter(brightness=0.1, contrast=0.1, p=0.3),
+    K.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    ),
+    data_keys=["image"]
+)
+
+val_transforms = AugmentationSequential(
+    K.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    ),
+    data_keys=["image"]
+)
+
+# Create task with transforms
+task = ClassificationTask(
+    model="resnet18",
+    in_channels=13,
+    num_classes=10,
+    loss="ce"
+)
+
+# Override on_after_batch_transfer for GPU augmentation
+def custom_batch_transfer(self, batch, dataloader_idx):
+    if self.trainer.training:
+        batch["image"] = train_transforms(batch["image"])
+    else:
+        batch["image"] = val_transforms(batch["image"])
+    return batch
+
+task.on_after_batch_transfer = custom_batch_transfer.__get__(task)
+
+# Train
+datamodule = EuroSATDataModule(root="data", batch_size=32)
+trainer = Trainer(max_epochs=10)
+trainer.fit(task, datamodule)
+```
+
+## Best practices
+
+<Tip>
+**Apply augmentations on GPU** using `on_after_batch_transfer` for better performance.
+</Tip>
+
+<Warning>
+**Don't augment test data** - only apply normalization during inference.
+</Warning>
+
+<Info>
+**Reproducibility**: Set `same_on_batch=True` if you need the same augmentation for all images in a batch.
+</Info>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="DataModules" icon="database" href="/concepts/datamodules">
+    Learn about pre-configured DataModules
+  </Card>
+  <Card title="Tutorial" icon="book-open" href="/tutorials/transforms">
+    Complete tutorial with augmentation examples
+  </Card>
+</CardGroup>

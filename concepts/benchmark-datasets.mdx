@@ -1,0 +1,280 @@
+---
+title: Benchmark datasets
+description: Working with curated datasets for model training and evaluation
+---
+
+Benchmark datasets in TorchGeo are curated datasets with input images and target labels. They're designed for reproducible research and include datasets for classification, segmentation, detection, and more.
+
+## Overview
+
+TorchGeo includes 100+ benchmark datasets for various remote sensing tasks:
+
+- **Image classification**: EuroSAT, RESISC45, UC Merced
+- **Semantic segmentation**: Inria Aerial, DeepGlobe, LoveDA
+- **Object detection**: VHR-10, DIOR, DOTA
+- **Change detection**: OSCD, LEVIR-CD+
+- **Instance segmentation**: iSAID, HRSCD
+
+<Note>
+If you've used torchvision before, TorchGeo datasets will feel familiar. The main difference is that samples are returned as dictionaries instead of tuples.
+</Note>
+
+## Base classes
+
+### NonGeoDataset
+
+The abstract base class for non-geospatial datasets. Unlike `GeoDataset`, these use integer indexing:
+
+```python
+from torchgeo.datasets import NonGeoDataset
+
+class MyDataset(NonGeoDataset):
+    def __getitem__(self, index: int):
+        # Return sample at given index
+        return {"image": image, "label": label}
+```
+
+### NonGeoClassificationDataset
+
+For folder-structured classification datasets:
+
+```python
+from torchgeo.datasets import NonGeoClassificationDataset
+
+class MyClassificationDataset(NonGeoClassificationDataset):
+    directory = "my_dataset"
+    # Dataset organized as: root/class_name/*.jpg
+```
+
+## Using benchmark datasets
+
+All benchmark datasets follow the same pattern:
+
+<Steps>
+  <Step title="Initialize the dataset">
+    Create an instance with the root directory and split:
+    
+    ```python
+    from torchgeo.datasets import EuroSAT
+    
+    dataset = EuroSAT(
+        root="data",
+        split="train",
+        download=True,
+        checksum=True
+    )
+    ```
+  </Step>
+  
+  <Step title="Create a DataLoader">
+    Use PyTorch's DataLoader for batching:
+    
+    ```python
+    from torch.utils.data import DataLoader
+    
+    dataloader = DataLoader(
+        dataset,
+        batch_size=32,
+        shuffle=True,
+        num_workers=4
+    )
+    ```
+  </Step>
+  
+  <Step title="Iterate through batches">
+    Access images and labels in your training loop:
+    
+    ```python
+    for batch in dataloader:
+        image = batch["image"]  # (batch, channels, height, width)
+        label = batch["label"]  # (batch,)
+        # Train your model...
+    ```
+  </Step>
+</Steps>
+
+## Classification example
+
+Here's a complete example using EuroSAT:
+
+```python
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from torchgeo.datasets import EuroSAT
+import timm
+
+# Load dataset
+train_dataset = EuroSAT(root="data", split="train", download=True)
+val_dataset = EuroSAT(root="data", split="val")
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32)
+
+# Create model
+model = timm.create_model(
+    "resnet18",
+    in_chans=13,  # EuroSAT has 13 Sentinel-2 bands
+    num_classes=10
+)
+
+# Training loop
+optimizer = torch.optim.Adam(model.parameters())
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(10):
+    for batch in train_loader:
+        image = batch["image"]
+        label = batch["label"]
+        
+        output = model(image)
+        loss = criterion(output, label)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+```
+
+## Object detection example
+
+For detection tasks, use a custom collate function:
+
+```python
+from torch.utils.data import DataLoader
+from torchgeo.datamodules.utils import collate_fn_detection
+from torchgeo.datasets import VHR10
+
+# Initialize dataset
+dataset = VHR10(root="data", download=True, checksum=True)
+
+# Use detection collate function
+dataloader = DataLoader(
+    dataset,
+    batch_size=4,
+    shuffle=True,
+    collate_fn=collate_fn_detection  # Required for detection
+)
+
+# Training loop
+for batch in dataloader:
+    images = batch["image"]       # List of images
+    boxes = batch["bbox_xyxy"]    # List of bounding boxes
+    labels = batch["label"]       # List of class labels
+    masks = batch["mask"]         # List of instance masks
+    # Train your detection model...
+```
+
+## Segmentation example
+
+```python
+from torchgeo.datasets import InriaAerialImageLabeling
+
+dataset = InriaAerialImageLabeling(
+    root="data",
+    split="train",
+    download=True
+)
+
+dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
+
+for batch in dataloader:
+    image = batch["image"]  # (8, 3, 5000, 5000)
+    mask = batch["mask"]    # (8, 5000, 5000)
+    # Train your segmentation model...
+```
+
+## Available datasets by task
+
+### Classification
+
+- **EuroSAT**: 10-class Sentinel-2 classification
+- **RESISC45**: 45-class aerial image classification
+- **UC Merced**: 21-class land use classification
+- **BigEarthNet**: Multi-label scene classification
+- **So2Sat**: LCZ classification
+
+### Semantic Segmentation
+
+- **Inria Aerial Image Labeling**: Building footprint segmentation
+- **DeepGlobe Land Cover**: 7-class land cover classification
+- **LoveDA**: Urban/rural land cover segmentation
+- **Potsdam2D/Vaihingen2D**: ISPRS segmentation benchmarks
+- **SpaceNet**: Building detection from satellite imagery
+
+### Object Detection
+
+- **VHR-10**: 10-class object detection in VHR imagery
+- **DIOR**: Large-scale object detection
+- **DOTA**: Oriented object detection
+- **FAIR1M**: Fine-grained object recognition
+
+### Change Detection
+
+- **OSCD**: Onera Satellite Change Detection
+- **LEVIR-CD+**: Building change detection
+
+## Common parameters
+
+Most datasets support these parameters:
+
+- `root`: Root directory for dataset storage
+- `split`: Dataset split ("train", "val", "test")
+- `transforms`: Augmentations to apply
+- `download`: Automatically download the dataset
+- `checksum`: Verify file integrity
+
+```python
+dataset = EuroSAT(
+    root="./data",
+    split="train",
+    transforms=my_transforms,
+    download=True,
+    checksum=True
+)
+```
+
+## Sample format
+
+All datasets return dictionaries with task-specific keys:
+
+<Tabs>
+  <Tab title="Classification">
+    ```python
+    {
+        "image": Tensor,  # (C, H, W)
+        "label": int,     # Class index
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Segmentation">
+    ```python
+    {
+        "image": Tensor,  # (C, H, W)
+        "mask": Tensor,   # (H, W)
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Detection">
+    ```python
+    {
+        "image": Tensor,        # (C, H, W)
+        "bbox_xyxy": Tensor,    # (N, 4)
+        "label": Tensor,        # (N,)
+        "mask": Tensor,         # (N, H, W) for instance seg
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="DataModules" icon="database" href="/concepts/datamodules">
+    Use pre-configured DataModules for easier training
+  </Card>
+  <Card title="Tutorial" icon="book-open" href="/tutorials/benchmark-datasets">
+    Complete tutorial with training examples
+  </Card>
+</CardGroup>

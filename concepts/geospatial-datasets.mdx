@@ -1,0 +1,176 @@
+---
+title: Geospatial datasets
+description: Working with datasets that have geographic metadata
+---
+
+Geospatial datasets in TorchGeo contain geographic metadata like coordinates, CRS, and resolution. They enable you to combine multiple data sources based on location and sample patches from large images.
+
+## Overview
+
+Many remote sensing applications involve working with geospatial datasets—datasets with geographic metadata. These datasets can be challenging due to:
+
+- Multispectral imagery with varying spectral bands per satellite
+- Different spatial resolutions
+- Multiple coordinate reference systems (CRS) requiring reprojection
+
+<Note>
+TorchGeo automatically handles CRS conversion and resolution matching when combining datasets.
+</Note>
+
+## Base classes
+
+TorchGeo provides several base classes for geospatial data:
+
+### GeoDataset
+
+The abstract base class for all geospatial datasets. Unlike `NonGeoDataset`, the presence of geospatial information allows datasets to be combined based on latitude/longitude.
+
+```python
+from torchgeo.datasets import GeoDataset
+
+class MyDataset(GeoDataset):
+    def __getitem__(self, index):
+        # Return sample for given spatiotemporal slice
+        pass
+```
+
+### RasterDataset
+
+For raster data stored in formats like GeoTIFF. Provides automatic file discovery and indexing.
+
+```python
+from torchgeo.datasets import Landsat8
+
+# Load all Landsat 8 files in a directory
+landsat = Landsat8(paths="path/to/landsat", bands=["B2", "B3", "B4"])
+```
+
+### VectorDataset
+
+For vector data in formats like Shapefile or GeoJSON.
+
+```python
+from torchgeo.datasets import VectorDataset
+
+# Load vector labels
+labels = VectorDataset(paths="path/to/labels.shp")
+```
+
+## Combining datasets
+
+TorchGeo makes it easy to combine multiple datasets using set operators:
+
+### Union operator (|)
+
+Combine datasets where queries must be present in **at least one** dataset:
+
+```python
+from torchgeo.datasets import Landsat7, Landsat8
+
+# Combine Landsat 7 and 8, treating them as equivalent
+landsat7 = Landsat7(paths="...", bands=["B1", "B2", "B3", "B4", "B5", "B7"])
+landsat8 = Landsat8(paths="...", bands=["B2", "B3", "B4", "B5", "B6", "B8"])
+landsat = landsat7 | landsat8
+```
+
+<Info>
+Use union when combining data from:
+- Multiple satellite missions (Landsat 7 + 8)
+- Different geographic regions (Chesapeake NY + PA)
+</Info>
+
+### Intersection operator (&)
+
+Combine datasets where queries must be present in **both** datasets:
+
+```python
+from torchgeo.datasets import Landsat8, CDL
+
+# Combine imagery with labels
+landsat = Landsat8(paths="...", bands=["B2", "B3", "B4"])
+cdl = CDL(paths="...", download=True)
+dataset = landsat & cdl
+```
+
+<Info>
+Use intersection when combining:
+- Image and target labels (Landsat + CDL)
+- Multiple image sources for fusion (Landsat + Sentinel)
+- Image with auxiliary data (Landsat + DEM)
+</Info>
+
+## Real-world example
+
+Here's a complete example combining Landsat imagery with crop labels:
+
+```python
+from torch.utils.data import DataLoader
+from torchgeo.datasets import Landsat7, Landsat8, CDL, stack_samples
+from torchgeo.samplers import RandomGeoSampler
+
+# Create union of Landsat 7 and 8 (common bands only)
+landsat7 = Landsat7(paths="data/landsat7", bands=["B1", "B2", "B3", "B4", "B5", "B7"])
+landsat8 = Landsat8(paths="data/landsat8", bands=["B2", "B3", "B4", "B5", "B6", "B8"])
+landsat = landsat7 | landsat8
+
+# Intersect with CDL labels
+cdl = CDL(paths="data/cdl", download=True, checksum=True)
+dataset = landsat & cdl
+
+# Sample 256x256 patches
+sampler = RandomGeoSampler(dataset, size=256, length=10000)
+dataloader = DataLoader(
+    dataset,
+    batch_size=128,
+    sampler=sampler,
+    collate_fn=stack_samples
+)
+
+# Training loop
+for batch in dataloader:
+    image = batch["image"]  # Landsat imagery
+    mask = batch["mask"]    # CDL labels
+    # Train your model...
+```
+
+## CRS and resolution handling
+
+<Warning>
+When combining datasets with different CRS or resolutions, TorchGeo will:
+1. Reproject all data to a common CRS
+2. Resample to a common resolution
+3. Warn you if datasets have mismatched CRS/resolution
+</Warning>
+
+```python
+# TorchGeo handles CRS conversion automatically
+sentinel = Sentinel2(paths="...")  # UTM projection
+landsat = Landsat8(paths="...")    # Different UTM zone
+dataset = sentinel & landsat       # Automatically reprojected
+```
+
+## Spatiotemporal indexing
+
+Geospatial datasets use spatiotemporal slices for indexing:
+
+```python
+# Index by bounding box and time range
+sample = dataset[xmin:xmax, ymin:ymax, tmin:tmax]
+
+# Image data
+image = sample["image"]  # Shape: (channels, height, width)
+
+# Bounding box used
+bbox = sample["bbox"]    # [xmin, xmax, ymin, ymax, tmin, tmax]
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Samplers" icon="grid" href="/concepts/samplers">
+    Learn how to sample patches from geospatial datasets
+  </Card>
+  <Card title="Tutorial" icon="book-open" href="/tutorials/geospatial-datasets">
+    Complete tutorial with examples
+  </Card>
+</CardGroup>

@@ -1,0 +1,140 @@
+---
+title: Introduction
+description: TorchGeo provides datasets, samplers, transforms, and pre-trained models for geospatial data
+---
+
+# Introduction to TorchGeo
+
+TorchGeo is a PyTorch domain library, similar to torchvision, providing datasets, samplers, transforms, and pre-trained models specific to geospatial data.
+
+<img src="https://raw.githubusercontent.com/torchgeo/torchgeo/main/docs/_static/logo/logo-color.svg" width="400" alt="TorchGeo logo" />
+
+## Our Mission
+
+The goal of TorchGeo is to make it simple:
+
+1. **For machine learning experts** to work with geospatial data
+2. **For remote sensing experts** to explore machine learning solutions
+
+Whether you're a deep learning researcher looking to apply your models to satellite imagery, or a remote sensing scientist wanting to leverage the latest ML techniques, TorchGeo bridges the gap between these two domains.
+
+## Quick Links
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Get started with pip, conda, or spack installation
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Jump right in with code examples
+  </Card>
+  <Card title="Tutorials" icon="book" href="/tutorials">
+    Step-by-step guides for common tasks
+  </Card>
+  <Card title="API Reference" icon="code" href="/api">
+    Complete documentation of all modules
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Geospatial Datasets
+
+Work with datasets that have geographic metadata - different CRS, resolutions, and spectral bands. TorchGeo handles the complexity of reprojecting and aligning data automatically.
+
+<img src="https://raw.githubusercontent.com/torchgeo/torchgeo/main/docs/_static/images/geodataset.png" alt="Example application combining Landsat and CDL" />
+
+**Features:**
+- Automatic CRS alignment and reprojection
+- Multi-spectral and multi-resolution support
+- Geospatial samplers for coordinate-based sampling
+- Union and intersection operations for combining datasets
+
+### Benchmark Datasets
+
+Access 50+ benchmark datasets for various tasks:
+- Image classification
+- Semantic segmentation
+- Object detection
+- Instance segmentation
+- Change detection
+- Regression
+
+All datasets support automatic download and checksum verification, just like torchvision.
+
+### Pre-trained Models
+
+<Note>
+TorchGeo is the first library to support models pre-trained on multispectral satellite imagery!
+</Note>
+
+Unlike ImageNet pre-training which only covers RGB channels, TorchGeo provides weights trained on:
+- Sentinel-2 (13 spectral bands)
+- Landsat (7-11 bands depending on satellite)
+- NAIP aerial imagery
+- And more!
+
+### Lightning Integration
+
+Built-in PyTorch Lightning datamodules and trainers provide:
+- Standard train/val/test splits for reproducibility
+- Pre-configured augmentations using kornia
+- Pre-calculated channel statistics
+- Task-specific trainers (classification, segmentation, etc.)
+
+## Why TorchGeo?
+
+### For ML Experts
+
+If you're familiar with PyTorch and torchvision but new to geospatial data, TorchGeo abstracts away the complexity:
+- No need to learn GDAL, rasterio, or geospatial concepts
+- Familiar PyTorch Dataset and DataLoader interfaces
+- Pre-built models and training pipelines
+- Benchmark datasets to test your ideas
+
+### For Remote Sensing Experts
+
+If you work with satellite or aerial imagery but are new to deep learning:
+- Easy integration with existing geospatial workflows
+- Automatic handling of CRS, resolution, and alignment
+- Pre-trained models specialized for remote sensing
+- Reproducible research with standard benchmarks
+
+## Community
+
+Join our growing community:
+
+- [Slack](https://torchgeo.slack.com/join/shared_invite/zt-22rse667m-eqtCeNW0yI000Tl4B~2PIw) - Chat with users and developers
+- [OSGeo](https://www.osgeo.org/community/getting-started-osgeo/) - Part of the Open Source Geospatial Foundation
+- [Hugging Face](https://huggingface.co/torchgeo) - Pre-trained models and datasets
+- [YouTube](https://www.youtube.com/@TorchGeo) - Tutorials and presentations
+
+## Next Steps
+
+<Steps>
+  <Step title="Install TorchGeo">
+    Follow our [installation guide](/installation) to set up TorchGeo
+  </Step>
+  <Step title="Try the Quickstart">
+    Run your first examples with our [quickstart guide](/quickstart)
+  </Step>
+  <Step title="Explore Tutorials">
+    Learn more with our comprehensive [tutorials](/tutorials)
+  </Step>
+</Steps>
+
+## Citation
+
+If you use TorchGeo in your research, please cite our paper:
+
+```bibtex
+@article{stewart2024torchgeo,
+    author = {Stewart, Adam J. and Robinson, Caleb and Corley, Isaac A. and Ortiz, Anthony and Lavista Ferres, Juan M. and Banerjee, Arindam},
+    title = {{TorchGeo}: Deep Learning With Geospatial Data},
+    journal = {ACM Transactions on Spatial Algorithms and Systems},
+    volume = {11},
+    number = {4},
+    pages = {1--28},
+    month = aug,
+    year = {2025}
+}
+```

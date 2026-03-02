@@ -1,0 +1,539 @@
+---
+title: Geospatial Datasets
+description: API reference for geospatial datasets with coordinate information
+---
+
+Geospatial datasets contain rich spatial metadata (coordinates, CRS, resolution) that enables spatial indexing and dataset combination operations.
+
+## Base Classes
+
+### GeoDataset
+
+Abstract base class for all geospatial datasets.
+
+```python
+from torchgeo.datasets import GeoDataset
+```
+
+**Key Features**:
+- Spatial and temporal indexing via bounding boxes
+- Coordinate Reference System (CRS) management
+- Dataset combination via intersection (`&`) and union (`|`) operators
+- Automatic CRS and resolution harmonization
+
+**Properties**:
+
+<ResponseField name="bounds" type="tuple[slice, slice, slice]">
+  Spatiotemporal bounds as (x_slice, y_slice, t_slice)
+</ResponseField>
+
+<ResponseField name="crs" type="pyproj.CRS">
+  Coordinate reference system of the dataset
+</ResponseField>
+
+<ResponseField name="res" type="tuple[float, float]">
+  Resolution in units of CRS as (xres, yres)
+</ResponseField>
+
+<ResponseField name="files" type="list[str]">
+  List of all files in the dataset
+</ResponseField>
+
+**Methods**:
+
+<ParamField path="__getitem__" type="(index: GeoSlice) -> Sample">
+  Retrieve data by spatiotemporal slice: `dataset[xmin:xmax:xres, ymin:ymax:yres, tmin:tmax]`
+</ParamField>
+
+<ParamField path="__and__" type="(other: GeoDataset) -> IntersectionDataset">
+  Take intersection of two datasets: `dataset1 & dataset2`
+</ParamField>
+
+<ParamField path="__or__" type="(other: GeoDataset) -> UnionDataset">
+  Take union of two datasets: `dataset1 | dataset2`
+</ParamField>
+
+**Example**:
+```python
+from torchgeo.datasets import Landsat8, CDL
+
+landsat = Landsat8(paths='data/landsat')
+cdl = CDL(paths='data/cdl')
+
+# Get bounds
+print(landsat.bounds)  # (slice(xmin, xmax, xres), slice(ymin, ymax, yres), slice(tmin, tmax))
+
+# Combine datasets
+dataset = landsat & cdl
+
+# Query spatiotemporal region
+sample = dataset[100:200:1, 300:400:1, '2020-01-01':'2020-12-31']
+```
+
+---
+
+### RasterDataset
+
+Base class for geospatial datasets stored as raster files (GeoTIFF, NetCDF, etc.).
+
+```python
+from torchgeo.datasets import RasterDataset
+
+class MyRasterDataset(RasterDataset):
+    filename_glob = '*.tif'
+    filename_regex = r'^(?P<date>\d{8}).*\.tif$'
+    date_format = '%Y%m%d'
+```
+
+**Constructor**:
+
+<ParamField path="paths" type="str | PathLike | Iterable[str | PathLike]" default="'data'">
+  One or more root directories to search or files to load
+</ParamField>
+
+<ParamField path="crs" type="pyproj.CRS | None" default="None">
+  Coordinate reference system to warp to (defaults to CRS of first file)
+</ParamField>
+
+<ParamField path="res" type="float | tuple[float, float] | None" default="None">
+  Resolution in units of CRS (defaults to resolution of first file)
+</ParamField>
+
+<ParamField path="bands" type="Sequence[str] | None" default="None">
+  Bands to load (defaults to all bands)
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Transform function applied to each sample
+</ParamField>
+
+<ParamField path="cache" type="bool" default="True">
+  If True, cache file handles to speed up repeated sampling
+</ParamField>
+
+<ParamField path="time_series" type="bool" default="False">
+  If True, stack files along time dimension [T, C, H, W]. If False, merge into mosaic [C, H, W]
+</ParamField>
+
+**Class Attributes**:
+
+<ParamField path="filename_glob" type="str" default="'*'">
+  Glob pattern to search for files
+</ParamField>
+
+<ParamField path="filename_regex" type="str" default="'.*'">
+  Regular expression to extract metadata (date, band name) from filename
+</ParamField>
+
+<ParamField path="date_format" type="str" default="'%Y%m%d'">
+  Date format string for parsing dates from filenames
+</ParamField>
+
+<ParamField path="is_image" type="bool" default="True">
+  If True, sample uses 'image' key. If False, uses 'mask' key
+</ParamField>
+
+<ParamField path="separate_files" type="bool" default="False">
+  If True, each band is stored in a separate file
+</ParamField>
+
+<ParamField path="all_bands" type="tuple[str, ...]" default="()">
+  Names of all available bands
+</ParamField>
+
+<ParamField path="rgb_bands" type="tuple[str, ...]" default="()">
+  Names of RGB bands for plotting
+</ParamField>
+
+**Example**:
+```python
+from torchgeo.datasets import RasterDataset
+
+class MyDataset(RasterDataset):
+    filename_glob = 'scene_*.tif'
+    filename_regex = r'^scene_(?P<date>\d{8})_(?P<band>[A-Z0-9]+)\.tif$'
+    date_format = '%Y%m%d'
+    separate_files = True
+    all_bands = ('B1', 'B2', 'B3', 'B4')
+    rgb_bands = ('B3', 'B2', 'B1')
+
+dataset = MyDataset(
+    paths='data/my_rasters',
+    bands=['B2', 'B3', 'B4'],
+    crs='EPSG:32610',
+    res=10.0
+)
+```
+
+See also: [Landsat](#landsat-datasets), [Sentinel](#sentinel-datasets), [NAIP](#naip)
+
+---
+
+### VectorDataset
+
+Base class for geospatial datasets stored as vector files (Shapefile, GeoPackage, GeoJSON).
+
+```python
+from torchgeo.datasets import VectorDataset
+```
+
+**Constructor**:
+
+<ParamField path="paths" type="str | PathLike | Iterable[str | PathLike]" default="'data'">
+  One or more root directories to search or files to load
+</ParamField>
+
+<ParamField path="crs" type="pyproj.CRS | None" default="None">
+  Coordinate reference system to warp to
+</ParamField>
+
+<ParamField path="res" type="float | tuple[float, float]" default="(0.0001, 0.0001)">
+  Resolution for rasterizing vectors
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Transform function applied to each sample
+</ParamField>
+
+<ParamField path="label_name" type="str | None" default="None">
+  Name of the property/column containing labels to rasterize
+</ParamField>
+
+<ParamField path="task" type="Literal['semantic_segmentation', 'object_detection', 'instance_segmentation']" default="'semantic_segmentation'">
+  Computer vision task determining output format
+</ParamField>
+
+<ParamField path="layer" type="str | int | None" default="None">
+  Layer to load from multilayer formats (GeoPackage). Can be layer name or index
+</ParamField>
+
+**Output Format by Task**:
+
+- `semantic_segmentation`: Returns `{'mask': Tensor}` with shape [H, W]
+- `object_detection`: Returns `{'bbox_xyxy': Tensor, 'label': Tensor}` with shapes [N, 4] and [N]
+- `instance_segmentation`: Returns `{'mask': Tensor, 'bbox_xyxy': Tensor, 'label': Tensor}`
+
+**Example**:
+```python
+from torchgeo.datasets import VectorDataset
+
+# Semantic segmentation
+dataset = VectorDataset(
+    paths='data/buildings.gpkg',
+    label_name='building_type',
+    task='semantic_segmentation',
+    res=1.0
+)
+
+# Object detection
+dataset = VectorDataset(
+    paths='data/objects.geojson',
+    label_name='class_id',
+    task='object_detection'
+)
+```
+
+See also: [OpenStreetMap](/api/datasets/geospatial#openstreetmap), [Chesapeake](#chesapeake-datasets)
+
+---
+
+### XarrayDataset
+
+<Warning>
+  This dataset is experimental and subject to change. The API may change in future releases.
+</Warning>
+
+Base class for geospatial datasets stored as Xarray-compatible formats (NetCDF, Zarr).
+
+```python
+from torchgeo.datasets import XarrayDataset
+```
+
+**Constructor**:
+
+<ParamField path="paths" type="str | PathLike | Iterable[str | PathLike]" default="'data'">
+  One or more root directories to search or files to load
+</ParamField>
+
+<ParamField path="crs" type="pyproj.CRS | None" default="None">
+  Coordinate reference system to warp to
+</ParamField>
+
+<ParamField path="res" type="float | tuple[float, float] | None" default="None">
+  Resolution in units of CRS
+</ParamField>
+
+<ParamField path="data_vars" type="Sequence[str] | None" default="None">
+  Data variables to load (defaults to all variables)
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Transform function applied to each sample
+</ParamField>
+
+**Requirements**:
+- Requires `rioxarray` package
+
+**Example**:
+```python
+from torchgeo.datasets import XarrayDataset
+
+dataset = XarrayDataset(
+    paths='data/climate.nc',
+    data_vars=['temperature', 'precipitation'],
+    crs='EPSG:4326'
+)
+```
+
+---
+
+## Combination Datasets
+
+### IntersectionDataset
+
+Dataset representing the intersection of two GeoDatasets. Samples must exist in both datasets.
+
+```python
+from torchgeo.datasets import IntersectionDataset, Landsat8, CDL
+
+landsat = Landsat8(paths='data/landsat')
+cdl = CDL(paths='data/cdl')
+
+# Using operator
+dataset = landsat & cdl
+
+# Using constructor
+dataset = IntersectionDataset(landsat, cdl)
+```
+
+**Constructor**:
+
+<ParamField path="dataset1" type="GeoDataset">
+  First dataset
+</ParamField>
+
+<ParamField path="dataset2" type="GeoDataset">
+  Second dataset
+</ParamField>
+
+<ParamField path="spatial_only" type="bool" default="False">
+  If True, ignore temporal dimension when computing intersection
+</ParamField>
+
+<ParamField path="collate_fn" type="Callable" default="concat_samples">
+  Function to combine samples from both datasets
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Transform function applied after combining samples
+</ParamField>
+
+**Use Cases**:
+- Combine image and labels (e.g., Landsat + CDL)
+- Multimodal learning (e.g., Landsat + Sentinel)
+- Image + auxiliary data (e.g., imagery + elevation)
+
+---
+
+### UnionDataset
+
+Dataset representing the union of two GeoDatasets. Samples can exist in either dataset.
+
+```python
+from torchgeo.datasets import UnionDataset, Landsat7, Landsat8
+
+landsat7 = Landsat7(paths='data/landsat7')
+landsat8 = Landsat8(paths='data/landsat8')
+
+# Using operator
+dataset = landsat7 | landsat8
+
+# Using constructor
+dataset = UnionDataset(landsat7, landsat8)
+```
+
+**Constructor**:
+
+<ParamField path="dataset1" type="GeoDataset">
+  First dataset
+</ParamField>
+
+<ParamField path="dataset2" type="GeoDataset">
+  Second dataset
+</ParamField>
+
+<ParamField path="collate_fn" type="Callable" default="merge_samples">
+  Function to merge samples when both exist
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Transform function applied after merging
+</ParamField>
+
+**Use Cases**:
+- Combine data from multiple sensors (e.g., Landsat 7 + Landsat 8)
+- Combine data from different regions (e.g., Chesapeake NY + PA)
+- Fill gaps in temporal coverage
+
+---
+
+## Major Geospatial Datasets
+
+### Landsat Datasets
+
+NASA/USGS satellite imagery from the Landsat program (1972-present).
+
+```python
+from torchgeo.datasets import (
+    Landsat,      # Generic Landsat loader
+    Landsat1,     # MSS (1972-1978)
+    Landsat2,     # MSS (1975-1982)
+    Landsat3,     # MSS (1978-1983)
+    Landsat4MSS,  # MSS (1982-1993)
+    Landsat4TM,   # TM (1982-1993)
+    Landsat5MSS,  # MSS (1984-2013)
+    Landsat5TM,   # TM (1984-2013)
+    Landsat7,     # ETM+ (1999-present)
+    Landsat8,     # OLI/TIRS (2013-present)
+    Landsat9,     # OLI-2/TIRS-2 (2021-present)
+)
+
+dataset = Landsat8(
+    paths='data/landsat8',
+    bands=['B2', 'B3', 'B4', 'B5', 'B6', 'B7'],
+    crs='EPSG:32610',
+    res=30.0
+)
+```
+
+**Available Bands** (Landsat 8/9):
+- `B1`: Coastal/Aerosol (0.43-0.45 μm)
+- `B2`: Blue (0.45-0.51 μm)
+- `B3`: Green (0.53-0.59 μm)
+- `B4`: Red (0.64-0.67 μm)
+- `B5`: NIR (0.85-0.88 μm)
+- `B6`: SWIR 1 (1.57-1.65 μm)
+- `B7`: SWIR 2 (2.11-2.29 μm)
+- `B8`: Panchromatic (0.50-0.68 μm)
+- `B9`: Cirrus (1.36-1.38 μm)
+- `B10`: TIRS 1 (10.6-11.19 μm)
+- `B11`: TIRS 2 (11.5-12.51 μm)
+- `QA_PIXEL`: Quality assessment
+
+---
+
+### Sentinel Datasets
+
+ESA Copernicus satellite imagery.
+
+```python
+from torchgeo.datasets import Sentinel, Sentinel1, Sentinel2
+
+# Sentinel-1 (SAR)
+s1 = Sentinel1(
+    paths='data/sentinel1',
+    bands=['VV', 'VH']
+)
+
+# Sentinel-2 (Multispectral)
+s2 = Sentinel2(
+    paths='data/sentinel2',
+    bands=['B02', 'B03', 'B04', 'B08'],
+    res=10.0
+)
+```
+
+**Sentinel-2 Bands**:
+- `B01`: Coastal aerosol (443 nm, 60m)
+- `B02`: Blue (490 nm, 10m)
+- `B03`: Green (560 nm, 10m)
+- `B04`: Red (665 nm, 10m)
+- `B05`: Red edge 1 (705 nm, 20m)
+- `B06`: Red edge 2 (740 nm, 20m)
+- `B07`: Red edge 3 (783 nm, 20m)
+- `B08`: NIR (842 nm, 10m)
+- `B8A`: NIR narrow (865 nm, 20m)
+- `B09`: Water vapor (945 nm, 60m)
+- `B11`: SWIR 1 (1610 nm, 20m)
+- `B12`: SWIR 2 (2190 nm, 20m)
+
+---
+
+### CDL (Cropland Data Layer)
+
+USDA crop-specific land cover maps for the continental United States.
+
+```python
+from torchgeo.datasets import CDL
+
+cdl = CDL(
+    paths='data/cdl',
+    crs='EPSG:32610',
+    res=30.0,
+    download=True,
+    checksum=True
+)
+```
+
+**Properties**:
+- 30m resolution
+- Annual coverage (2008-2024)
+- 134 crop classes
+- Continental US coverage
+- Used as ground truth labels
+
+---
+
+### NAIP (National Agriculture Imagery Program)
+
+High-resolution aerial imagery of the United States.
+
+```python
+from torchgeo.datasets import NAIP
+
+naip = NAIP(
+    paths='data/naip',
+    crs='EPSG:32610',
+    res=1.0  # 1 meter resolution
+)
+```
+
+**Properties**:
+- 1m resolution (before 2007: 2m)
+- 4 bands: RGB + NIR
+- US-wide coverage
+- Updated every 2-3 years
+
+---
+
+### Additional Geospatial Datasets
+
+**Elevation & Terrain**:
+- `AsterGDEM`: ASTER Global Digital Elevation Model
+- `EUDEM`: EU Digital Elevation Model
+
+**Land Cover**:
+- `NLCD`: National Land Cover Database (US)
+- `Esri2020`: Esri 10m global land cover
+- `EuroCrops`: European crop type maps
+
+**Climate & Weather**:
+- `EnMAP`: Hyperspectral satellite imagery
+- `PRISMA`: Hyperspectral satellite imagery
+
+**Buildings & Infrastructure**:
+- `OpenStreetMap`: Vector building footprints
+- `OpenBuildings`: Google Open Buildings dataset
+- `CanadianBuildingFootprints`: Microsoft building footprints
+
+**Specialized**:
+- `GBIF`: Species occurrence data
+- `EDDMapS`: Invasive species data
+- `CMSGlobalMangroveCanopy`: Mangrove canopy height
+- `GlobBiomass`: Forest biomass estimates
+
+## See Also
+
+- [Non-Geospatial Datasets](/api/datasets/non-geospatial) - Benchmark datasets for classification, segmentation, and detection
+- [Samplers](/api/samplers) - Strategies for sampling from geospatial datasets
+- [Transforms](/api/transforms) - Data augmentation for geospatial data

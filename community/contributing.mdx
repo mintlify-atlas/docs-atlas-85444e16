@@ -1,0 +1,278 @@
+---
+title: Contributing
+description: Learn how to contribute to TorchGeo
+---
+
+TorchGeo is an open-source project built by contributors like you from around the world. We welcome contributions, suggestions, and feedback to help improve the library.
+
+## Getting Started
+
+If you find a bug or would like to add a new feature, please open a pull request. You can find a curated list of issues that we believe are easy for new contributors to tackle at [github.com/torchgeo/torchgeo/contribute](https://github.com/torchgeo/torchgeo/contribute).
+
+## Development Setup
+
+<Steps>
+  <Step title="Install TorchGeo">
+    Clone the repository and install TorchGeo in development mode with all dependencies:
+    
+    ```bash
+    git clone https://github.com/torchgeo/torchgeo.git
+    cd torchgeo
+    pip install -e ".[all]"
+    ```
+  </Step>
+  
+  <Step title="Run the linters">
+    Before submitting a pull request, run the linters to ensure your code meets the project's style requirements:
+    
+    ```bash
+    ruff format && ruff check && ty check && prettier --write .
+    ```
+  </Step>
+  
+  <Step title="Run the tests">
+    Ensure all tests pass and maintain 100% code coverage:
+    
+    ```bash
+    # Run all tests (skip slow tests)
+    pytest --cov=torchgeo tests/
+    
+    # Run a single test file
+    pytest --cov=torchgeo.datasets tests/datasets/test_foo.py
+    
+    # Run a specific test method
+    pytest --cov=torchgeo.datasets tests/datasets/test_foo.py::TestFooDataset::test_getitem
+    ```
+  </Step>
+  
+  <Step title="Build the documentation">
+    If you've made changes to the documentation, build it locally to preview:
+    
+    ```bash
+    cd docs && make clean && make html
+    ```
+    
+    Note: This requires Pandoc to be installed and `pip install ".[docs]"`.
+  </Step>
+  
+  <Step title="Submit a pull request">
+    Once you've made your changes and all tests pass, submit a pull request on GitHub. Make sure to:
+    
+    - Write a clear PR title that matches release notes style
+    - Describe what your changes do and why they're needed
+    - Link to any related issues
+    - Ensure all CI checks pass
+  </Step>
+</Steps>
+
+## Code Style Requirements
+
+### File Headers
+
+All new files must include the following copyright header:
+
+```python
+# Copyright (c) TorchGeo Contributors. All rights reserved.
+# Licensed under the MIT License.
+```
+
+### Formatting with Ruff
+
+TorchGeo uses [Ruff](https://docs.astral.sh/ruff/) for code formatting and linting:
+
+- Use single quotes for strings
+- No trailing commas
+- Imports should follow isort order: stdlib → third-party → local
+- Use local imports (`from .utils`) in `torchgeo/`; absolute imports (`from torchgeo`) in `tests/`
+
+### Type Hints
+
+All functions require full type annotations:
+
+- Use `X | Y` for unions (not `Union[X, Y]`)
+- Avoid `Any`; use `Sequence` for parameters, `list`/`tuple` for return values
+- Prefer built-in types (`list`, `dict`, `tuple`) over `typing.List`, etc.
+- Use `type: ignore` only for external library issues
+
+### Docstrings
+
+Use Google-style docstrings with proper structure:
+
+```python
+def func(x: Tensor, weights: Weights | None = None) -> Tensor:
+    """Short description.
+
+    Args:
+        x: Input tensor.
+        weights: Pre-trained weights.
+
+    Returns:
+        Output tensor.
+
+    Raises:
+        ValueError: If x is empty.
+
+    Warns:
+        UserWarning: If weights are outdated.
+
+    """
+```
+
+Key requirements:
+- Period after first line; blank line after first sentence
+- Include `Args`, `Returns`, `Raises`, `Warns` sections as needed
+- Don't document default values in Args (Sphinx adds them)
+- Use `.. versionadded::` for new features; `.. deprecated::` for deprecations
+- Inline comments should explain "why", not "what"
+
+## Testing Requirements
+
+TorchGeo requires **100% test coverage** for all code:
+
+- Write tests using pytest fixtures
+- Use fake data in `tests/data/<dataset>/` (never real data)
+- Generate fake data with `data.py` scripts
+- Mark slow tests (downloads/network) with `@pytest.mark.slow`
+- Use `pytest.importorskip('pkg', minversion='X.X')` for optional dependencies
+- Call `plt.close()` at the end of plotting tests
+
+Example test structure:
+
+```python
+class TestFooDataset:
+    @pytest.fixture
+    def dataset(self) -> FooDataset:
+        return FooDataset(root='tests/data')
+
+    def test_getitem(self, dataset: FooDataset) -> None:
+        x = dataset[0]
+        assert x['image'].ndim == 3
+        assert x['mask'].ndim == 2
+```
+
+Check coverage with:
+
+```bash
+pytest --cov=torchgeo.datasets tests/datasets/test_foo.py
+```
+
+## Adding New Datasets
+
+To add a new dataset to TorchGeo, follow this checklist:
+
+<Steps>
+  <Step title="Create the dataset class">
+    Add `torchgeo/datasets/foo.py` with the dataset implementation. Include the license header and proper docstrings.
+    
+    For raster datasets:
+    
+    ```python
+    class MyDataset(RasterDataset):
+        filename_glob = '*.tif'
+        filename_regex = r'^(?P<date>\d{8})_.*\.tif$'
+        date_format = '%Y%m%d'
+        is_image = True
+    ```
+  </Step>
+  
+  <Step title="Import in __init__.py">
+    Add your dataset to `torchgeo/datasets/__init__.py`
+  </Step>
+  
+  <Step title="Create test data">
+    Add `tests/data/foo/data.py` to generate fake data matching the real structure
+  </Step>
+  
+  <Step title="Write tests">
+    Add `tests/datasets/test_foo.py` with 100% coverage
+  </Step>
+  
+  <Step title="Update documentation">
+    Add your dataset to:
+    - `docs/api/datasets.rst`
+    - `docs/api/datasets/[non_]geo_datasets.csv`
+  </Step>
+</Steps>
+
+### Dataset Implementation Guidelines
+
+- Use `root='data'` as default parameter
+- Implement `_verify()` for existence checks
+- Return sample dictionaries: `{"image": tensor, "mask": tensor}`
+- Use PIL for non-geo images, rasterio for geo images
+
+## Pull Request Process
+
+When submitting a pull request:
+
+1. **Write clear PR titles** that match release notes style
+2. **Separate logical changes** into separate PRs
+3. **Update MD5s** when test files change
+4. **Keep files under 500 lines** of code
+5. **Add license headers** to new files
+6. **Don't skip hooks** (--no-verify, --no-gpg-sign) unless explicitly necessary
+7. **Never force push** to main/master branches
+
+## Frequently Asked Questions
+
+<Accordion title="How do I run only fast tests?">
+  By default, `pytest --cov=torchgeo tests/` skips slow tests. To include slow tests (downloads/network), run:
+  
+  ```bash
+  pytest -m "" --cov=torchgeo tests/
+  ```
+</Accordion>
+
+<Accordion title="What if my code depends on an optional dependency?">
+  Use lazy imports inside the function that needs the dependency, with a helpful error message:
+  
+  ```python
+  def some_function():
+      try:
+          import scipy
+      except ImportError:
+          raise ImportError('scipy required for this functionality')
+  ```
+  
+  In tests, use:
+  
+  ```python
+  pytest.importorskip('scipy', minversion='1.9.0')
+  ```
+</Accordion>
+
+<Accordion title="How do I handle errors in datasets?">
+  - Never catch bare `Exception`; be specific
+  - Use TorchGeo exceptions from `torchgeo.datasets.errors` when applicable (e.g., `DatasetNotFoundError`, `RGBBandsMissingError`, `DependencyNotFoundError`)
+  - Document all exceptions in the `Raises` section of docstrings
+</Accordion>
+
+<Accordion title="What are the import conventions?">
+  - In `torchgeo/` modules: use relative imports (`from .utils import helper`)
+  - In `tests/` modules: use absolute imports (`from torchgeo.datasets import MyDataset`)
+  - Follow isort order: stdlib → third-party → local
+</Accordion>
+
+<Accordion title="How should I structure my commits?">
+  - Follow the project's commit message style (check `git log` for examples)
+  - Keep commits focused on a single logical change
+  - Add license headers to new files
+  - Update checksums (MD5s) when test data changes
+</Accordion>
+
+## Code of Conduct
+
+This project has adopted the [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/). For questions or concerns, contact @adamjstewart on [Slack](https://torchgeo.slack.com/join/shared_invite/zt-22rse667m-eqtCeNW0yI000Tl4B~2PIw).
+
+## License
+
+All contributions, suggestions, and feedback you submit are accepted under the [MIT License](https://github.com/torchgeo/torchgeo/blob/main/LICENSE). You represent that if you do not own copyright in the code, you have the authority to submit it under this license.
+
+## Getting Help
+
+If you need help contributing:
+
+- Check the [Contributing Guide](https://torchgeo.readthedocs.io/en/stable/user/contributing.html) in the documentation
+- Join the [TorchGeo Slack](https://torchgeo.slack.com/join/shared_invite/zt-22rse667m-eqtCeNW0yI000Tl4B~2PIw)
+- Open a [discussion on GitHub](https://github.com/torchgeo/torchgeo/discussions)
+- Browse [good first issues](https://github.com/torchgeo/torchgeo/contribute)

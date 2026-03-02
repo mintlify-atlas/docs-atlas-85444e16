@@ -1,0 +1,249 @@
+---
+title: 'Transforms'
+description: 'Data augmentation and preprocessing transforms'
+---
+
+TorchGeo provides domain-specific transforms for geospatial data, including spectral indices, color transforms, spatial augmentations, and temporal rearrangement.
+
+## Transform Modules
+
+### Indices
+
+Spectral index transforms that append computed indices as new channels to your imagery.
+
+#### Normalized Difference Indices
+
+- `AppendNormalizedDifferenceIndex` - Generic normalized difference index (NDI)
+- `AppendNDVI` - Normalized Difference Vegetation Index
+- `AppendNDWI` - Normalized Difference Water Index
+- `AppendNDSI` - Normalized Difference Snow Index
+- `AppendNDBI` - Normalized Difference Built-up Index
+- `AppendNBR` - Normalized Burn Ratio
+- `AppendNDRE` - Normalized Difference Red Edge
+- `AppendGNDVI` - Green Normalized Difference Vegetation Index
+- `AppendGRNDVI` - Green-Red Normalized Difference Vegetation Index
+- `AppendGBNDVI` - Green-Blue Normalized Difference Vegetation Index
+- `AppendBNDVI` - Blue Normalized Difference Vegetation Index
+- `AppendRBNDVI` - Red-Blue Normalized Difference Vegetation Index
+
+#### Other Indices
+
+- `AppendSWI` - Soil Water Index
+- `AppendTriBandNormalizedDifferenceIndex` - Generic three-band normalized difference
+
+### Color
+
+- `RandomGrayscale` - Randomly convert image to grayscale
+
+### Spatial
+
+- `SatSlideMix` - Satellite image mixing augmentation for contrastive learning
+
+### Temporal
+
+- `Rearrange` - Rearrange temporal dimensions of satellite image time series
+
+## Common Transforms
+
+### AppendNormalizedDifferenceIndex
+
+Base class for computing normalized difference indices:
+
+```
+NDI = (A - B) / (A + B)
+```
+
+<ParamField path="index_a" type="int" required>
+  Reference band channel index
+</ParamField>
+
+<ParamField path="index_b" type="int" required>
+  Difference band channel index
+</ParamField>
+
+### AppendNDVI
+
+Normalized Difference Vegetation Index - measures vegetation health and density:
+
+```
+NDVI = (NIR - Red) / (NIR + Red)
+```
+
+<ParamField path="index_nir" type="int" required>
+  Index of the Near Infrared (NIR) band
+</ParamField>
+
+<ParamField path="index_red" type="int" required>
+  Index of the Red band
+</ParamField>
+
+### AppendNDWI
+
+Normalized Difference Water Index - detects water bodies:
+
+```
+NDWI = (Green - NIR) / (Green + NIR)
+```
+
+<ParamField path="index_green" type="int" required>
+  Index of the Green band
+</ParamField>
+
+<ParamField path="index_nir" type="int" required>
+  Index of the Near Infrared (NIR) band
+</ParamField>
+
+### AppendNBR
+
+Normalized Burn Ratio - identifies burned areas:
+
+```
+NBR = (NIR - SWIR) / (NIR + SWIR)
+```
+
+<ParamField path="index_nir" type="int" required>
+  Index of the Near Infrared (NIR) band
+</ParamField>
+
+<ParamField path="index_swir" type="int" required>
+  Index of the Short-wave Infrared (SWIR) band
+</ParamField>
+
+## Integration with Kornia
+
+TorchGeo transforms are built on top of Kornia and can be combined with other Kornia augmentations:
+
+```python
+import kornia.augmentation as K
+from torchgeo.transforms import AppendNDVI
+
+# Combine TorchGeo and Kornia transforms
+transforms = K.AugmentationSequential(
+    AppendNDVI(index_nir=3, index_red=0),
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    K.RandomRotation(degrees=90),
+    K.Normalize(mean=0, std=255),
+    data_keys=['image', 'mask']
+)
+```
+
+## Usage in DataModules
+
+Transforms are typically applied in the `on_after_batch_transfer` hook for GPU acceleration:
+
+```python
+from lightning.pytorch import LightningDataModule
+import kornia.augmentation as K
+from torchgeo.transforms import AppendNDVI, AppendNDWI
+
+class CustomDataModule(LightningDataModule):
+    def __init__(self):
+        super().__init__()
+        
+        # Training augmentations
+        self.train_aug = K.AugmentationSequential(
+            AppendNDVI(index_nir=7, index_red=3),
+            AppendNDWI(index_green=2, index_nir=7),
+            K.RandomHorizontalFlip(p=0.5),
+            K.RandomVerticalFlip(p=0.5),
+            K.Normalize(mean=0, std=255),
+            data_keys=['image']
+        )
+        
+        # Validation augmentations (no random transforms)
+        self.val_aug = K.AugmentationSequential(
+            AppendNDVI(index_nir=7, index_red=3),
+            AppendNDWI(index_green=2, index_nir=7),
+            K.Normalize(mean=0, std=255),
+            data_keys=['image']
+        )
+    
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        """Apply augmentations on GPU."""
+        if self.trainer.training:
+            batch = self.train_aug(batch)
+        else:
+            batch = self.val_aug(batch)
+        return batch
+```
+
+## Sentinel-2 Band Indices
+
+For Sentinel-2 imagery (13 bands), here are common band indices:
+
+```python
+from torchgeo.transforms import (
+    AppendNDVI,
+    AppendNDWI,
+    AppendNDBI,
+    AppendNBR
+)
+
+# Sentinel-2 band indices:
+# 0: Coastal Aerosol, 1: Blue, 2: Green, 3: Red
+# 4: Red Edge 1, 5: Red Edge 2, 6: Red Edge 3
+# 7: NIR, 8: Red Edge 4, 9: Water Vapor
+# 10: SWIR 1, 11: SWIR 2, 12: Cirrus
+
+transforms = K.AugmentationSequential(
+    AppendNDVI(index_nir=7, index_red=3),     # Vegetation
+    AppendNDWI(index_green=2, index_nir=7),   # Water
+    AppendNDBI(index_swir=10, index_nir=7),   # Built-up areas
+    AppendNBR(index_nir=7, index_swir=11),    # Burned areas
+    data_keys=['image']
+)
+```
+
+## Landsat Band Indices
+
+For Landsat imagery:
+
+```python
+# Landsat 8/9 band indices:
+# 0: Coastal/Aerosol, 1: Blue, 2: Green, 3: Red
+# 4: NIR, 5: SWIR 1, 6: SWIR 2, 7: Cirrus
+# 8: Panchromatic, 9: Thermal 1, 10: Thermal 2
+
+transforms = K.AugmentationSequential(
+    AppendNDVI(index_nir=4, index_red=3),
+    AppendNDWI(index_green=2, index_nir=4),
+    AppendNBR(index_nir=4, index_swir=6),
+    data_keys=['image']
+)
+```
+
+## Custom Indices
+
+Create custom spectral indices by subclassing:
+
+```python
+from torchgeo.transforms import AppendNormalizedDifferenceIndex
+
+class AppendCustomIndex(AppendNormalizedDifferenceIndex):
+    """Custom Normalized Difference Index."""
+    
+    def __init__(self, index_band1: int, index_band2: int):
+        """Initialize transform.
+        
+        Args:
+            index_band1: First band index
+            index_band2: Second band index
+        """
+        super().__init__(index_a=index_band1, index_b=index_band2)
+```
+
+## Best Practices
+
+1. **Apply on GPU**: Use `on_after_batch_transfer` to apply transforms after data is moved to GPU
+2. **Normalize last**: Apply normalization as the final transform
+3. **Indices first**: Compute spectral indices before other augmentations
+4. **Mask handling**: Cast masks to float before Kornia transforms, restore dtype after
+5. **Data keys**: Specify `data_keys` in `AugmentationSequential` to apply transforms to specific tensors
+
+## References
+
+For more information about spectral indices:
+
+- [Index Database](https://www.indexdatabase.de/db/i.php)
+- [Awesome Spectral Indices](https://github.com/awesome-spectral-indices/awesome-spectral-indices)

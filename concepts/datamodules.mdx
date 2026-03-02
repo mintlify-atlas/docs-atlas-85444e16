@@ -1,0 +1,321 @@
+---
+title: DataModules
+description: Pre-configured data pipelines for reproducible research
+---
+
+DataModules in TorchGeo provide standardized train-val-test splits, pre-configured augmentations, and preprocessing for reproducible research. They wrap datasets and dataloaders into a single reusable component.
+
+## Overview
+
+TorchGeo provides 60+ DataModules based on Lightning's `LightningDataModule`. Each DataModule:
+
+- Defines standard train/val/test splits
+- Includes pre-computed normalization statistics
+- Configures appropriate augmentations
+- Handles data downloading and preprocessing
+
+<Note>
+DataModules make it easy to reproduce results from papers and compare different models fairly.
+</Note>
+
+## Why use DataModules?
+
+<CardGroup cols={2}>
+  <Card title="Reproducibility" icon="rotate">
+    Standardized splits ensure fair comparisons
+  </Card>
+  <Card title="Simplicity" icon="sparkles">
+    One object handles all data operations
+  </Card>
+  <Card title="Best practices" icon="check">
+    Pre-configured with optimal augmentations
+  </Card>
+  <Card title="No boilerplate" icon="code">
+    Less code to write and maintain
+  </Card>
+</CardGroup>
+
+## Using a DataModule
+
+DataModules work seamlessly with Lightning:
+
+```python
+from lightning.pytorch import Trainer
+from torchgeo.datamodules import EuroSATDataModule
+from torchgeo.trainers import ClassificationTask
+
+# Create DataModule
+datamodule = EuroSATDataModule(
+    root="data",
+    batch_size=32,
+    num_workers=4
+)
+
+# Create task
+task = ClassificationTask(
+    model="resnet18",
+    in_channels=13,
+    num_classes=10,
+    loss="ce"
+)
+
+# Train
+trainer = Trainer(max_epochs=10)
+trainer.fit(task, datamodule)
+```
+
+## Common parameters
+
+All DataModules support these parameters:
+
+- `root`: Root directory for dataset storage
+- `batch_size`: Number of samples per batch
+- `num_workers`: Number of data loading workers
+- `val_split_pct`: Validation split percentage (if no predefined split)
+- `val_split_size`: Validation split size (if no predefined split)
+- `test_split_pct`: Test split percentage (if no predefined split)
+- `test_split_size`: Test split size (if no predefined split)
+- `download`: Whether to download the dataset
+- `checksum`: Whether to verify checksums
+
+```python
+datamodule = InriaAerialImageLabelingDataModule(
+    root="./data",
+    batch_size=8,
+    num_workers=6,
+    val_split_pct=0.2,  # 20% for validation
+    download=True,
+    checksum=True
+)
+```
+
+## Available DataModules
+
+### Classification
+
+- `EuroSATDataModule`: 10-class Sentinel-2 scene classification
+- `RESISC45DataModule`: 45-class aerial image classification  
+- `UCMercedDataModule`: 21-class land use classification
+- `BigEarthNetDataModule`: Multi-label scene classification
+- `So2SatDataModule`: Local Climate Zone classification
+
+### Semantic Segmentation
+
+- `InriaAerialImageLabelingDataModule`: Building segmentation
+- `DeepGlobeLandCoverDataModule`: Land cover classification
+- `LoveDADataModule`: Urban/rural segmentation
+- `Potsdam2DDataModule`: ISPRS Potsdam benchmark
+- `SpaceNet1DataModule`: Building footprint extraction
+
+### Change Detection
+
+- `OSCDDataModule`: Onera Satellite Change Detection
+- `LEVIRCDPlusDataModule`: Building change detection
+
+### Other Tasks
+
+- `CowCCountingDataModule`: Car counting
+- `CycloneDataModule`: Tropical cyclone intensity estimation
+- `FireRiskDataModule`: Wildfire risk prediction
+
+## Custom augmentations
+
+Override default augmentations:
+
+```python
+import kornia.augmentation as K
+from kornia.augmentation import AugmentationSequential
+
+# Custom augmentations
+custom_aug = AugmentationSequential(
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    K.RandomRotation(degrees=45, p=0.5),
+    data_keys=["image", "mask"]
+)
+
+datamodule = InriaAerialImageLabelingDataModule(
+    root="data",
+    batch_size=8,
+    aug=custom_aug  # Use custom augmentations
+)
+```
+
+## Accessing dataloaders
+
+DataModules provide train/val/test dataloaders:
+
+```python
+datamodule.setup("fit")
+
+# Get dataloaders
+train_loader = datamodule.train_dataloader()
+val_loader = datamodule.val_dataloader()
+
+# Manual training loop
+for batch in train_loader:
+    image = batch["image"]
+    label = batch["label"]
+    # Train your model...
+```
+
+## Creating custom DataModules
+
+Extend `BaseDataModule` or `GeoDataModule`:
+
+```python
+from torchgeo.datamodules import NonGeoDataModule
+from torchgeo.datasets import MyCustomDataset
+
+class MyDataModule(NonGeoDataModule):
+    def __init__(self, root="data", batch_size=32, num_workers=4, **kwargs):
+        super().__init__(
+            MyCustomDataset,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            **kwargs
+        )
+        self.root = root
+    
+    def setup(self, stage=None):
+        if stage in ["fit", "validate"]:
+            self.train_dataset = MyCustomDataset(
+                root=self.root,
+                split="train",
+                transforms=self.train_aug
+            )
+            self.val_dataset = MyCustomDataset(
+                root=self.root,
+                split="val",
+                transforms=self.val_aug
+            )
+        
+        if stage == "test":
+            self.test_dataset = MyCustomDataset(
+                root=self.root,
+                split="test",
+                transforms=self.test_aug
+            )
+```
+
+## DataModule lifecycle
+
+Understand the Lightning DataModule methods:
+
+<Steps>
+  <Step title="prepare_data">
+    Download and extract data (called once, on a single process)
+    
+    ```python
+    def prepare_data(self):
+        # Download dataset if needed
+        MyDataset(root=self.root, download=True)
+    ```
+  </Step>
+  
+  <Step title="setup">
+    Create dataset instances (called on each process)
+    
+    ```python
+    def setup(self, stage=None):
+        if stage == "fit":
+            self.train_dataset = MyDataset(root=self.root, split="train")
+            self.val_dataset = MyDataset(root=self.root, split="val")
+    ```
+  </Step>
+  
+  <Step title="train/val/test_dataloader">
+    Return dataloaders for each split
+    
+    ```python
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True
+        )
+    ```
+  </Step>
+</Steps>
+
+## Complete example
+
+Here's a full training example:
+
+```python
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from torchgeo.datamodules import EuroSATDataModule
+from torchgeo.trainers import ClassificationTask
+
+# Configure DataModule
+datamodule = EuroSATDataModule(
+    root="./data",
+    batch_size=32,
+    num_workers=4,
+    download=True
+)
+
+# Configure task
+task = ClassificationTask(
+    model="resnet50",
+    in_channels=13,
+    num_classes=10,
+    loss="ce",
+    lr=1e-3,
+    patience=10
+)
+
+# Configure callbacks
+checkpoint = ModelCheckpoint(
+    monitor="val_loss",
+    mode="min",
+    save_top_k=1
+)
+
+early_stop = EarlyStopping(
+    monitor="val_loss",
+    patience=10,
+    mode="min"
+)
+
+# Train
+trainer = Trainer(
+    max_epochs=100,
+    callbacks=[checkpoint, early_stop],
+    accelerator="auto",
+    devices=1
+)
+
+trainer.fit(task, datamodule)
+
+# Test
+trainer.test(task, datamodule, ckpt_path="best")
+```
+
+## Best practices
+
+<Tip>
+**Use DataModules for reproducibility** - They ensure consistent data splits and preprocessing across experiments.
+</Tip>
+
+<Warning>
+**prepare_data vs setup**: 
+- `prepare_data`: Downloads only, no state assignment
+- `setup`: Creates datasets, called on each GPU/process
+</Warning>
+
+<Info>
+**Custom splits**: If a dataset doesn't have predefined splits, use `val_split_pct` to create one automatically.
+</Info>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Trainers" icon="brain" href="/training/trainers">
+    Learn about Lightning trainers
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/datamodules">
+    Complete DataModule API documentation
+  </Card>
+</CardGroup>

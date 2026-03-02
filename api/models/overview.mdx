@@ -1,0 +1,133 @@
+---
+title: Models Overview
+description: Pre-trained models and weights for geospatial deep learning
+---
+
+TorchGeo provides a comprehensive collection of pre-trained models and weights specifically designed for remote sensing and geospatial applications. These models support multispectral satellite imagery and leverage state-of-the-art self-supervised learning methods.
+
+## Key Features
+
+### Pre-trained Weights for Multispectral Data
+
+Unlike standard computer vision models trained on RGB images, TorchGeo models are pre-trained on multispectral satellite imagery including:
+
+- **Sentinel-1** (SAR): 2 channels (VV, VH)
+- **Sentinel-2** (Optical): Up to 13 spectral bands
+- **Landsat**: 6-11 channels depending on sensor (TM, ETM+, OLI/TIRS)
+- **Multi-sensor**: Combined modalities for robust feature learning
+
+### Self-Supervised Learning Methods
+
+Models are pre-trained using various SSL methods:
+
+- **MoCo**: Momentum Contrast for unsupervised learning
+- **SimCLR**: Simple framework for contrastive learning
+- **MAE**: Masked Autoencoders for self-supervised learning
+- **DINO**: Self-distillation with no labels
+- **SeCo**: Seasonal contrast for temporal understanding
+- **DeCUR**: Decoupled contrastive learning
+- **SoftCon**: Soft contrastive learning
+
+### Integration with timm
+
+TorchGeo models leverage the [timm](https://github.com/huggingface/pytorch-image-models) library for model implementations, providing:
+
+- Consistent API across all models
+- Easy weight loading and model creation
+- Support for feature extraction and fine-tuning
+- Flexible input channel configuration
+
+## Model Categories
+
+### Classification Backbones
+
+Pre-trained encoders suitable for transfer learning:
+- ResNet (18, 50, 152)
+- Vision Transformer (Small, Base, Large, Huge)
+- Swin Transformer (Tiny, Small, Base)
+- DOFA (Dynamic One-For-All)
+- Presto (Pretrained Remote Sensing Transformer)
+
+### Segmentation Models
+
+Models designed for dense prediction tasks:
+- U-Net with various encoders
+- FCN (Fully Convolutional Network)
+- FarSeg (Foreground-Aware Relation Network)
+
+### Change Detection Models
+
+Specialized architectures for temporal analysis:
+- ChangeStar
+- ChangeStarFarSeg
+- FCSiamDiff, FCSiamConc
+
+### Foundation Models
+
+Large-scale models trained on diverse geospatial data:
+- DOFA: Works with any spectral bands via dynamic convolutions
+- Presto: Temporal transformer for Sentinel-1/2 time series
+- CopernicusFM: Copernicus Foundation Model
+- ScaleMAE: Scale-aware masked autoencoder
+
+## Quick Start
+
+### Loading Pre-trained Weights
+
+```python
+from torchgeo.models import resnet50, ResNet50_Weights
+
+# Load model with Sentinel-2 weights (13 channels)
+weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
+model = resnet50(weights=weights)
+
+# Model is ready for fine-tuning
+for param in model.parameters():
+    param.requires_grad = True
+```
+
+### Using the Weights API
+
+```python
+from torchgeo.models import get_weight, get_model_weights
+
+# Get a specific weight by string name
+weight = get_weight('ResNet50_Weights.SENTINEL2_ALL_MOCO')
+
+# List all available weights for a model
+weights = get_model_weights('resnet50')
+for w in weights:
+    print(f"{w}: {w.meta['dataset']} - {w.meta.get('ssl_method', 'N/A')}")
+```
+
+### Creating Models with Custom Channels
+
+```python
+from torchgeo.models import vit_small_patch16_224
+
+# Create model without weights (random initialization)
+model = vit_small_patch16_224(in_chans=4)  # 4 channels for RGB + NIR
+
+# Load weights and modify first layer for different channels
+weights = ViTSmall16_Weights.SENTINEL2_ALL_MOCO
+model = vit_small_patch16_224(weights=weights)  # Loads with 13 channels
+```
+
+## Training Datasets
+
+Models are pre-trained on large-scale remote sensing datasets:
+
+- **SSL4EO-S12**: 250k+ Sentinel-1/2 image pairs
+- **SSL4EO-L**: 500k+ Landsat images (TM, ETM+, OLI)
+- **SatlasPretrain**: Global coverage Sentinel-2 imagery
+- **fMoW**: Functional Map of the World satellite imagery
+- **Five-Billion-Pixels**: Large-scale hyperspectral dataset
+
+<CardGroup cols={2}>
+  <Card title="Pre-trained Weights" icon="weight-hanging" href="/api/models/pretrained-weights">
+    Browse all available weight classes and their metadata
+  </Card>
+  <Card title="Model Architectures" icon="diagram-project" href="/api/models/architectures">
+    Explore model architectures and their implementations
+  </Card>
+</CardGroup>

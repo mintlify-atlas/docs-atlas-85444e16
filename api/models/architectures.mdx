@@ -1,0 +1,574 @@
+---
+title: Model Architectures
+description: Deep learning architectures for geospatial applications
+---
+
+TorchGeo implements a variety of model architectures optimized for remote sensing tasks. Models are organized by their primary use case: classification backbones, segmentation, change detection, and foundation models.
+
+## Classification Backbones
+
+Pre-trained encoders suitable for transfer learning and feature extraction.
+
+### ResNet
+
+Residual Networks for image classification and feature extraction.
+
+**Available Variants:**
+- `resnet18`: 18-layer ResNet (11.7M parameters)
+- `resnet50`: 50-layer ResNet (25.6M parameters)  
+- `resnet152`: 152-layer ResNet (60.2M parameters)
+
+**Key Features:**
+- Residual connections for training deep networks
+- Multiple pre-trained weights for different sensors
+- Support for arbitrary input channels via `in_chans` parameter
+- Based on timm implementation
+
+**Usage:**
+```python
+from torchgeo.models import resnet50, ResNet50_Weights
+
+# Load with pre-trained weights
+weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
+model = resnet50(weights=weights)
+
+# Custom number of channels
+model = resnet50(in_chans=4, num_classes=10)
+```
+
+**Reference:** [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
+
+---
+
+### Vision Transformer (ViT)
+
+Transformer-based architecture for image classification.
+
+**Available Variants:**
+- `vit_small_patch16_224`: Small ViT with 16x16 patches (22M parameters)
+- `vit_base_patch16_224`: Base ViT with 16x16 patches (86M parameters)
+- `vit_large_patch16_224`: Large ViT with 16x16 patches (304M parameters)
+- `vit_huge_patch14_224`: Huge ViT with 14x14 patches (632M parameters)
+- `vit_small_patch14_dinov2`: Small DINOv2 ViT with 14x14 patches
+- `vit_base_patch14_dinov2`: Base DINOv2 ViT with 14x14 patches
+
+**Key Features:**
+- Pure transformer architecture without convolutions
+- Self-attention mechanisms for global context
+- Extensive pre-trained weights from SSL4EO-S12 and SSL4EO-L
+- Support for MAE, DINO, MoCo, and other SSL methods
+
+**Usage:**
+```python
+from torchgeo.models import vit_small_patch16_224, ViTSmall16_Weights
+
+# Load with Sentinel-2 MAE weights
+weights = ViTSmall16_Weights.SENTINEL2_ALL_MAE
+model = vit_small_patch16_224(weights=weights)
+
+# Feature extraction mode
+model = vit_small_patch16_224(weights=weights, features_only=True)
+```
+
+**Reference:** [An Image is Worth 16x16 Words](https://arxiv.org/abs/2010.11929)
+
+---
+
+### Swin Transformer
+
+Hierarchical vision transformer with shifted windows.
+
+**Available Variants:**
+- `swin_t`: Tiny Swin Transformer
+- `swin_s`: Small Swin Transformer  
+- `swin_b`: Base Swin Transformer
+- `swin_v2_t`: Swin Transformer V2 Tiny
+- `swin_v2_b`: Swin Transformer V2 Base
+
+**Key Features:**
+- Hierarchical feature maps at multiple scales
+- Shifted window attention for efficiency
+- Pre-trained on SatlasPretrain dataset
+- Support for both RGB and multispectral inputs
+
+**Usage:**
+```python
+from torchgeo.models import swin_v2_t, Swin_V2_T_Weights
+
+# Load with Satlas weights
+weights = Swin_V2_T_Weights.SENTINEL2_MI_MS_SATLAS
+model = swin_v2_t(weights=weights)
+```
+
+**Reference:** [Swin Transformer: Hierarchical Vision Transformer using Shifted Windows](https://arxiv.org/abs/2103.14030)
+
+---
+
+## Foundation Models
+
+Large-scale models trained on diverse geospatial data with specialized capabilities.
+
+### DOFA (Dynamic One-For-All)
+
+A dynamic model that adapts to any number of spectral bands via wavelength-conditioned convolutions.
+
+**Available Variants:**
+- `dofa_small_patch16_224`: Small DOFA (22M parameters)
+- `dofa_base_patch16_224`: Base DOFA (86M parameters)
+- `dofa_large_patch16_224`: Large DOFA (304M parameters)
+- `dofa_huge_patch14_224`: Huge DOFA (632M parameters)
+
+**Key Features:**
+- **Dynamic channel adaptation**: Works with any spectral bands by conditioning on wavelengths
+- Trained on SatlasPretrain, Five-Billion-Pixels, and HySpecNet-11k
+- Transformer architecture with dynamic weight generator
+- Pre-trained with MAE (Masked Autoencoding)
+
+**Usage:**
+```python
+from torchgeo.models import dofa_base_patch16_224, DOFABase16_Weights
+
+# Load pre-trained weights
+weights = DOFABase16_Weights.DOFA_MAE
+model = dofa_base_patch16_224(weights=weights)
+
+# Forward pass with wavelengths (in micrometers)
+wavelengths = [0.443, 0.490, 0.560, 0.665, 0.705]  # 5 bands
+output = model(x, wavelengths=wavelengths)
+```
+
+**Reference:** [Dynamic One-For-All (DOFA)](https://arxiv.org/abs/2403.15356)
+
+---
+
+### Presto
+
+Pretrained Remote Sensing Transformer for Sentinel-1/2 time series.
+
+**Key Features:**
+- Temporal transformer for satellite image time series
+- Encoder-decoder architecture with masked token prediction
+- Multi-modal: Sentinel-1 SAR + Sentinel-2 optical
+- Includes auxiliary inputs: Dynamic World labels, lat/lon, month
+- Pre-trained on LEM (Presto pretraining dataset)
+
+**Band Groups:**
+- S1: Sentinel-1 (VV, VH)
+- S2_RGB, S2_Red_Edge, S2_NIR, S2_SWIR: Sentinel-2 bands
+- ERA5: Climate reanalysis data
+- SRTM: Elevation data
+- NDVI: Vegetation index
+
+**Usage:**
+```python
+from torchgeo.models import presto, Presto_Weights
+import torch
+
+# Load pre-trained model
+weights = Presto_Weights.PRESTO
+model = presto(weights=weights)
+
+# Input format: [batch, timesteps, channels]
+x = torch.randn(2, 12, 17)  # 2 samples, 12 timesteps, 17 channels
+dynamic_world = torch.randint(0, 9, (2, 12))  # Land cover labels
+latlons = torch.randn(2, 2)  # Latitude/longitude
+
+# Forward pass
+reconstructed, dw_output = model(x, dynamic_world, latlons)
+```
+
+**Reference:** [Presto: A Foundation Model for Remote Sensing](https://arxiv.org/abs/2304.14065)
+
+---
+
+### CopernicusFM
+
+Copernicus Foundation Model for multi-temporal satellite imagery.
+
+**Available Variants:**
+- `copernicusfm_base`: Base CopernicusFM model
+
+**Key Features:**
+- Multi-temporal Sentinel-2 processing
+- Foundation model trained on Copernicus data
+- Supports various downstream tasks
+
+**Usage:**
+```python
+from torchgeo.models import copernicusfm_base, CopernicusFM_Base_Weights
+
+model = copernicusfm_base()
+```
+
+---
+
+### ScaleMAE
+
+Scale-aware Masked Autoencoder for multi-resolution imagery.
+
+**Available Variants:**
+- `scalemae_large_patch16`: Large ScaleMAE with patch size 16
+
+**Key Features:**
+- Multi-scale masked autoencoding
+- Handles images at different spatial resolutions
+- Vision transformer backbone
+
+**Usage:**
+```python
+from torchgeo.models import scalemae_large_patch16, ScaleMAELarge16_Weights
+
+model = scalemae_large_patch16()
+```
+
+---
+
+### Other Foundation Models
+
+**CROMA (Contrastive Multi-modal Alignment):**
+- `croma_base`: Base CROMA model
+- `croma_large`: Large CROMA model  
+- Multi-modal contrastive learning
+
+**Aurora:**
+- `aurora_swin_unet`: Swin-UNet for weather forecasting
+
+**Panopticon:**
+- `panopticon_vitb14`: Vision transformer for global monitoring
+
+**EarthLoc:**
+- `earthloc`: Model for geographic location prediction
+
+**Tessera:**
+- `tessera`: Tessellated earth observation model
+
+**TileNet:**
+- `tilenet`: Tile-based representation learning
+
+---
+
+## Segmentation Models
+
+Dense prediction models for pixel-wise classification tasks.
+
+### U-Net
+
+U-shaped encoder-decoder architecture for semantic segmentation.
+
+**Key Features:**
+- Encoder-decoder with skip connections
+- Multiple encoder backbones (EfficientNet, ResNet, etc.)
+- Pre-trained weights for field boundary detection
+- Based on segmentation_models_pytorch (smp)
+
+**Usage:**
+```python
+from torchgeo.models import unet, Unet_Weights
+
+# Load with pre-trained weights
+weights = Unet_Weights.SENTINEL2_2CLASS_FTW
+model = unet(weights=weights)
+
+# Custom architecture
+import segmentation_models_pytorch as smp
+model = smp.Unet(
+    encoder_name='resnet50',
+    encoder_weights=None,
+    in_channels=13,
+    classes=10
+)
+```
+
+**Available Pre-trained Weights:**
+- Field boundary detection (2-class and 3-class)
+- Various EfficientNet encoders (B3, B5, B7)
+- Commercial and non-commercial licenses
+
+**Reference:** [U-Net: Convolutional Networks for Biomedical Image Segmentation](https://arxiv.org/abs/1505.04597)
+
+---
+
+### FCN (Fully Convolutional Network)
+
+Simple fully convolutional architecture for semantic segmentation.
+
+**Key Features:**
+- 5-layer fully convolutional architecture
+- LeakyReLU activations
+- Lightweight and fast
+- Customizable number of filters
+
+**Usage:**
+```python
+from torchgeo.models import FCN
+
+# Create FCN model
+model = FCN(
+    in_channels=13,      # Sentinel-2 bands
+    classes=10,          # Number of output classes
+    num_filters=64       # Filters per conv layer
+)
+```
+
+---
+
+### FarSeg
+
+Foreground-Aware Relation Network for object segmentation.
+
+**Key Features:**
+- ResNet backbone with FPN (Feature Pyramid Network)
+- Foreground-scene relation module
+- Designed for building, road, ship segmentation
+- Can be extended for change detection
+
+**Usage:**
+```python
+from torchgeo.models import FarSeg
+from torchgeo.models import ResNet50_Weights
+
+# Create FarSeg with pre-trained backbone
+backbone_weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
+model = FarSeg(
+    backbone='resnet50',
+    classes=2,  # Binary segmentation
+    backbone_weights=backbone_weights
+)
+```
+
+**Reference:** [Foreground-Aware Relation Network for Geospatial Object Segmentation](https://arxiv.org/abs/2011.09766)
+
+---
+
+## Change Detection Models
+
+Models specialized for detecting changes between bi-temporal images.
+
+### ChangeStar
+
+Change detection model combining segmentation and change prediction.
+
+**Key Features:**
+- Combines semantic segmentation with change detection
+- ChangeMixin module for binary change prediction
+- Bi-directional change detection (t1→t2 and t2→t1)
+- Architecture reusability: works with any segmentation backbone
+
+**Usage:**
+```python
+from torchgeo.models import ChangeStar
+from torchgeo.models import FarSeg
+
+# Create base segmentation model
+seg_model = FarSeg(backbone='resnet50', classes=10)
+
+# Wrap with ChangeStar for change detection
+model = ChangeStar(
+    seg_model=seg_model,
+    in_channels=128,  # Feature channels from seg_model
+    inner_channels=16,
+    num_convs=4
+)
+```
+
+**Reference:** [Change is Everywhere: Single-Temporal Supervised Object Change Detection](https://arxiv.org/abs/2108.07002)
+
+---
+
+### ChangeStarFarSeg
+
+Pre-configured ChangeStar with FarSeg backbone.
+
+**Usage:**
+```python
+from torchgeo.models import ChangeStarFarSeg
+
+model = ChangeStarFarSeg(
+    backbone='resnet50',
+    classes=10
+)
+```
+
+---
+
+### FCSiamDiff / FCSiamConc
+
+Siamese fully convolutional networks for change detection.
+
+**Variants:**
+- `FCSiamDiff`: Difference-based fusion
+- `FCSiamConc`: Concatenation-based fusion
+
+**Key Features:**
+- Siamese architecture with shared weights
+- Process bi-temporal images
+- Lightweight and efficient
+
+**Usage:**
+```python
+from torchgeo.models import FCSiamDiff, FCSiamConc
+
+# Difference-based
+model_diff = FCSiamDiff(in_channels=13, classes=2)
+
+# Concatenation-based  
+model_concat = FCSiamConc(in_channels=13, classes=2)
+```
+
+---
+
+### ChangeViT
+
+Vision transformer-based change detection model.
+
+**Usage:**
+```python
+from torchgeo.models import ChangeViT
+
+model = ChangeViT()
+```
+
+---
+
+## Time Series Models
+
+Models for temporal sequence processing.
+
+### ConvLSTM
+
+Convolutional LSTM for spatiotemporal sequence modeling.
+
+**Key Features:**
+- Combines CNN and LSTM for spatiotemporal patterns
+- Processes sequences of images
+- Maintains spatial structure through convolutions
+
+**Usage:**
+```python
+from torchgeo.models import ConvLSTM
+
+model = ConvLSTM(
+    input_dim=13,
+    hidden_dim=64,
+    kernel_size=(3, 3),
+    num_layers=2
+)
+```
+
+---
+
+### LTAE
+
+Lightweight Temporal Attention Encoder.
+
+**Key Features:**
+- Attention-based temporal encoding
+- Lightweight and efficient
+- Designed for satellite time series
+
+**Usage:**
+```python
+from torchgeo.models import LTAE
+
+model = LTAE(
+    in_channels=13,
+    n_head=4,
+    d_k=16,
+    d_model=64
+)
+```
+
+---
+
+## Other Models
+
+### RCF / MOSAIKS
+
+Random Convolutional Features for large-scale geospatial analysis.
+
+**Usage:**
+```python
+from torchgeo.models import RCF, MOSAIKS
+
+# Random convolutional features
+rcf = RCF(num_features=512)
+
+# MOSAIKS variant
+mosaiks = MOSAIKS(num_features=512)
+```
+
+**Reference:** [MOSAIKS: A measure of satellite imagery usability](https://www.nature.com/articles/s41467-021-24638-z)
+
+---
+
+### BTC
+
+Behavioral cloning model for trajectory prediction.
+
+**Usage:**
+```python
+from torchgeo.models import BTC
+
+model = BTC()
+```
+
+---
+
+## Model Selection Guide
+
+### For Image Classification
+
+**Small datasets (under 10k images):**
+- ResNet18/50 with pre-trained weights
+- ViT Small with MAE pre-training
+
+**Large datasets (over 100k images):**
+- ResNet152 or ViT Large/Huge
+- DOFA for multi-sensor/multi-spectral
+
+**Time series classification:**
+- Presto for Sentinel-1/2 time series
+- ConvLSTM or LTAE
+
+### For Semantic Segmentation
+
+**General segmentation:**
+- U-Net with EfficientNet encoder
+- FarSeg for object-aware segmentation
+
+**Field boundaries:**
+- U-Net with FTW pre-trained weights
+
+**Large-scale mapping:**
+- Swin Transformer with Satlas weights
+
+### For Change Detection
+
+**Binary change:**
+- ChangeStar with FarSeg
+- FCSiamDiff/FCSiamConc
+
+**Semantic change:**
+- ChangeStar for multi-class change
+- ChangeViT for transformer-based
+
+### For Multi-Sensor Fusion
+
+**Any spectral bands:**
+- DOFA (wavelength-conditioned)
+
+**Sentinel-1 + Sentinel-2:**
+- Presto (temporal)
+- Separate encoders with late fusion
+
+### For Transfer Learning
+
+**Best pre-trained weights:**
+- ResNet50: SENTINEL2_ALL_MOCO or SENTINEL2_ALL_DINO
+- ViT: SENTINEL2_ALL_MAE or SENTINEL2_ALL_FGMAE
+- DOFA: DOFA_MAE for any bands
+
+**Domain-specific:**
+- FTW weights for agricultural fields
+- Satlas weights for global mapping
+- SSL4EO-L for Landsat applications

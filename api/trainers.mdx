@@ -1,0 +1,570 @@
+---
+title: 'Trainers'
+description: 'PyTorch Lightning tasks for training geospatial models'
+---
+
+TorchGeo trainers (tasks) are PyTorch Lightning modules that define the training loop, loss functions, and metrics for various geospatial tasks.
+
+## Base Task
+
+### BaseTask
+
+Abstract base class for all TorchGeo trainers.
+
+<ParamField path="ignore" type="Sequence[str] | str | None" default="'weights'">
+  Parameters to ignore when saving hyperparameters
+</ParamField>
+
+**Key Methods:**
+- `configure_models()` - Initialize the model (abstract)
+- `configure_losses()` - Initialize the loss criterion
+- `configure_metrics()` - Initialize performance metrics
+- `configure_optimizers()` - Initialize optimizer and LR scheduler (default: AdamW + ReduceLROnPlateau)
+
+## Classification Tasks
+
+<Tabs>
+  <Tab title="ClassificationTask">
+    ### ClassificationTask
+
+    Image classification for binary, multiclass, or multilabel tasks.
+
+    <ParamField path="model" type="str" default="'resnet50'">
+      Name of the timm model to use
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights. True for ImageNet weights, False/None for random, or path to saved state dict
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels to model
+    </ParamField>
+
+    <ParamField path="task" type="Literal['binary', 'multiclass', 'multilabel']" default="'multiclass'">
+      Type of classification task
+    </ParamField>
+
+    <ParamField path="num_classes" type="int | None" default="None">
+      Number of prediction classes (for multiclass task)
+    </ParamField>
+
+    <ParamField path="num_labels" type="int | None" default="None">
+      Number of prediction labels (for multilabel task)
+    </ParamField>
+
+    <ParamField path="labels" type="list[str] | None" default="None">
+      List of class names
+    </ParamField>
+
+    <ParamField path="pos_weight" type="Tensor | None" default="None">
+      Weight of positive examples (used with 'bce' loss)
+    </ParamField>
+
+    <ParamField path="loss" type="Literal['ce', 'bce', 'jaccard', 'focal', 'dice']" default="'ce'">
+      Loss function to use
+    </ParamField>
+
+    <ParamField path="class_weights" type="Tensor | Sequence[float] | None" default="None">
+      Optional rescaling weight for each class (used with 'ce' loss)
+    </ParamField>
+
+    <ParamField path="ignore_index" type="int | None" default="None">
+      Optional class index to ignore in loss and metrics
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate for optimizer
+    </ParamField>
+
+    <ParamField path="patience" type="int" default="10">
+      Patience for learning rate scheduler
+    </ParamField>
+
+    <ParamField path="freeze_backbone" type="bool" default="False">
+      Freeze the backbone to linear probe the classifier head
+    </ParamField>
+
+    **Example:**
+    ```python
+    from torchgeo.trainers import ClassificationTask
+    from lightning.pytorch import Trainer
+
+    task = ClassificationTask(
+        model='resnet50',
+        in_channels=13,
+        num_classes=10,
+        loss='ce',
+        lr=1e-3
+    )
+
+    trainer = Trainer(max_epochs=50)
+    trainer.fit(model=task, datamodule=datamodule)
+    ```
+  </Tab>
+
+  <Tab title="MultiLabelClassificationTask">
+    ### MultiLabelClassificationTask
+
+    Multi-label image classification where each sample can have multiple labels.
+
+    Inherits all parameters from `ClassificationTask` with `task='multilabel'` by default.
+
+    **Example:**
+    ```python
+    task = MultiLabelClassificationTask(
+        model='resnet18',
+        in_channels=3,
+        num_labels=17,  # BigEarthNet has 17 labels
+        loss='bce'
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Segmentation Task
+
+### SemanticSegmentationTask
+
+Semantic segmentation for pixel-wise classification.
+
+<ParamField path="model" type="str" default="'unet'">
+  Name of the segmentation model
+</ParamField>
+
+<ParamField path="backbone" type="str" default="'resnet50'">
+  Name of the backbone encoder
+</ParamField>
+
+<ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+  Initial model weights
+</ParamField>
+
+<ParamField path="in_channels" type="int" default="3">
+  Number of input channels
+</ParamField>
+
+<ParamField path="num_classes" type="int" required>
+  Number of output classes
+</ParamField>
+
+<ParamField path="loss" type="Literal['ce', 'jaccard', 'focal', 'dice']" default="'ce'">
+  Loss function to use
+</ParamField>
+
+<ParamField path="class_weights" type="Tensor | Sequence[float] | None" default="None">
+  Optional rescaling weight for each class
+</ParamField>
+
+<ParamField path="ignore_index" type="int | None" default="None">
+  Optional class index to ignore
+</ParamField>
+
+<ParamField path="lr" type="float" default="1e-3">
+  Learning rate
+</ParamField>
+
+<ParamField path="patience" type="int" default="10">
+  Learning rate scheduler patience
+</ParamField>
+
+**Example:**
+```python
+from torchgeo.trainers import SemanticSegmentationTask
+
+task = SemanticSegmentationTask(
+    model='unet',
+    backbone='resnet50',
+    in_channels=4,
+    num_classes=5,
+    loss='jaccard',
+    lr=1e-4
+)
+```
+
+## Detection Tasks
+
+<Tabs>
+  <Tab title="ObjectDetectionTask">
+    ### ObjectDetectionTask
+
+    Object detection using bounding boxes.
+
+    <ParamField path="model" type="str" default="'faster-rcnn'">
+      Name of the detection model
+    </ParamField>
+
+    <ParamField path="backbone" type="str" default="'resnet50'">
+      Name of the backbone
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="num_classes" type="int" required>
+      Number of object classes (including background)
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+
+    <ParamField path="patience" type="int" default="10">
+      Patience for LR scheduler
+    </ParamField>
+
+    **Example:**
+    ```python
+    task = ObjectDetectionTask(
+        model='faster-rcnn',
+        backbone='resnet50',
+        in_channels=3,
+        num_classes=11,  # 10 object classes + background
+        lr=1e-3
+    )
+    ```
+  </Tab>
+
+  <Tab title="InstanceSegmentationTask">
+    ### InstanceSegmentationTask
+
+    Instance segmentation for pixel-wise object detection.
+
+    <ParamField path="model" type="str" default="'mask-rcnn'">
+      Name of the instance segmentation model
+    </ParamField>
+
+    <ParamField path="backbone" type="str" default="'resnet50'">
+      Name of the backbone
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="num_classes" type="int" required>
+      Number of object classes
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+
+    <ParamField path="patience" type="int" default="10">
+      Patience for LR scheduler
+    </ParamField>
+  </Tab>
+</Tabs>
+
+## Change Detection Task
+
+### ChangeDetectionTask
+
+Binary change detection between two time steps.
+
+<ParamField path="model" type="str" default="'unet'">
+  Name of the segmentation model
+</ParamField>
+
+<ParamField path="backbone" type="str" default="'resnet50'">
+  Name of the backbone encoder
+</ParamField>
+
+<ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+  Initial model weights
+</ParamField>
+
+<ParamField path="in_channels" type="int" default="3">
+  Number of input channels per time step
+</ParamField>
+
+<ParamField path="loss" type="Literal['ce', 'jaccard', 'focal', 'dice']" default="'ce'">
+  Loss function
+</ParamField>
+
+<ParamField path="lr" type="float" default="1e-3">
+  Learning rate
+</ParamField>
+
+**Example:**
+```python
+task = ChangeDetectionTask(
+    model='unet',
+    backbone='resnet18',
+    in_channels=3,
+    loss='jaccard'
+)
+```
+
+## Regression Tasks
+
+<Tabs>
+  <Tab title="RegressionTask">
+    ### RegressionTask
+
+    Regression for predicting continuous values from images.
+
+    <ParamField path="model" type="str" default="'resnet50'">
+      Name of the timm model
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="loss" type="Literal['mse', 'mae', 'rmse']" default="'mse'">
+      Loss function
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+
+    <ParamField path="patience" type="int" default="10">
+      Patience for LR scheduler
+    </ParamField>
+
+    **Example:**
+    ```python
+    task = RegressionTask(
+        model='resnet18',
+        in_channels=13,
+        loss='rmse',
+        lr=1e-4
+    )
+    ```
+  </Tab>
+
+  <Tab title="PixelwiseRegressionTask">
+    ### PixelwiseRegressionTask
+
+    Pixel-wise regression for predicting continuous values at each pixel.
+
+    <ParamField path="model" type="str" default="'unet'">
+      Name of the segmentation model
+    </ParamField>
+
+    <ParamField path="backbone" type="str" default="'resnet50'">
+      Name of the backbone
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="loss" type="Literal['mse', 'mae', 'rmse']" default="'mse'">
+      Loss function
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+  </Tab>
+</Tabs>
+
+## Self-Supervised Learning Tasks
+
+Self-supervised learning tasks for pre-training encoders without labels.
+
+<Tabs>
+  <Tab title="BYOLTask">
+    ### BYOLTask
+
+    Bootstrap Your Own Latent (BYOL) for self-supervised learning.
+
+    <ParamField path="model" type="str" default="'resnet50'">
+      Name of the encoder model
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+
+    **Example:**
+    ```python
+    task = BYOLTask(
+        model='resnet50',
+        in_channels=13,
+        lr=1e-3
+    )
+    ```
+  </Tab>
+
+  <Tab title="MoCoTask">
+    ### MoCoTask
+
+    Momentum Contrast (MoCo) for self-supervised learning.
+
+    <ParamField path="model" type="str" default="'resnet50'">
+      Name of the encoder model
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+  </Tab>
+
+  <Tab title="SimCLRTask">
+    ### SimCLRTask
+
+    SimCLR (Simple Framework for Contrastive Learning) for self-supervised learning.
+
+    <ParamField path="model" type="str" default="'resnet50'">
+      Name of the encoder model
+    </ParamField>
+
+    <ParamField path="weights" type="WeightsEnum | str | bool | None" default="None">
+      Initial model weights
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+  </Tab>
+</Tabs>
+
+## Complete Training Example
+
+```python
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
+from torchgeo.datamodules import EuroSATDataModule
+from torchgeo.trainers import ClassificationTask
+
+# Initialize datamodule
+datamodule = EuroSATDataModule(
+    root='data',
+    batch_size=128,
+    num_workers=6,
+    download=True
+)
+
+# Initialize task
+task = ClassificationTask(
+    model='resnet50',
+    in_channels=13,  # Sentinel-2 has 13 bands
+    num_classes=10,
+    loss='ce',
+    lr=1e-3,
+    patience=5,
+    freeze_backbone=False
+)
+
+# Callbacks
+checkpoint_callback = ModelCheckpoint(
+    monitor='val_loss',
+    mode='min',
+    save_top_k=1,
+    filename='best-{epoch:02d}-{val_loss:.2f}'
+)
+
+early_stopping = EarlyStopping(
+    monitor='val_loss',
+    patience=10,
+    mode='min'
+)
+
+# Trainer
+trainer = Trainer(
+    max_epochs=100,
+    callbacks=[checkpoint_callback, early_stopping],
+    accelerator='gpu',
+    devices=1,
+    precision='16-mixed'
+)
+
+# Train
+trainer.fit(model=task, datamodule=datamodule)
+
+# Test
+trainer.test(model=task, datamodule=datamodule, ckpt_path='best')
+```
+
+## Custom Tasks
+
+You can create custom tasks by subclassing `BaseTask`:
+
+```python
+from torchgeo.trainers import BaseTask
+import torch.nn as nn
+
+class CustomTask(BaseTask):
+    def __init__(self, num_classes=10, lr=1e-3):
+        self.num_classes = num_classes
+        self.lr = lr
+        super().__init__()
+    
+    def configure_models(self):
+        """Initialize your model."""
+        self.model = YourCustomModel(
+            num_classes=self.num_classes
+        )
+    
+    def configure_losses(self):
+        """Initialize loss function."""
+        self.criterion = nn.CrossEntropyLoss()
+    
+    def training_step(self, batch, batch_idx):
+        """Training step."""
+        x = batch['image']
+        y = batch['label']
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        self.log('train_loss', loss)
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        """Validation step."""
+        x = batch['image']
+        y = batch['label']
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        self.log('val_loss', loss)
+        return loss
+```
+
+## Key Features
+
+- **Automatic optimization**: Built-in AdamW + ReduceLROnPlateau
+- **Hyperparameter logging**: All parameters saved via `save_hyperparameters`
+- **Multiple losses**: Support for CE, BCE, Jaccard, Focal, Dice
+- **Flexible architectures**: Support for timm models, torchvision models, custom models
+- **Transfer learning**: Load pre-trained weights and optionally freeze backbone
+- **Multi-channel support**: Handle arbitrary number of input channels

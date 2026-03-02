@@ -1,0 +1,108 @@
+---
+title: Changelog
+description: Release history and version updates for TorchGeo
+---
+
+TorchGeo follows [semantic versioning](https://semver.org/). The current development version is **0.10.0.dev0**.
+
+## Release Notes
+
+For detailed release notes, including new features, bug fixes, and breaking changes, please visit the [GitHub Releases page](https://github.com/torchgeo/torchgeo/releases).
+
+<Card title="View All Releases" icon="github" href="https://github.com/torchgeo/torchgeo/releases">
+  See the complete changelog on GitHub with detailed information about each release
+</Card>
+
+## Latest Stable Release
+
+The latest stable version of TorchGeo can be installed via pip:
+
+```bash
+pip install torchgeo
+```
+
+For conda installation:
+
+```bash
+conda install -c conda-forge torchgeo
+```
+
+For spack installation:
+
+```bash
+spack install py-torchgeo
+```
+
+## Development Version
+
+To install the latest development version with all features:
+
+```bash
+git clone https://github.com/torchgeo/torchgeo.git
+cd torchgeo
+pip install -e ".[all]"
+```
+
+## Version History
+
+TorchGeo has evolved significantly since its initial release. Major milestones include:
+
+- **Pre-trained weights** for multiple satellite sensors
+- **Lightning datamodules and trainers** for reproducible research
+- Support for **geospatial datasets** with coordinate reference systems
+- **100+ datasets** for various remote sensing tasks
+- **Multiple computer vision tasks**: classification, segmentation, detection, regression, and more
+
+For a complete history of changes, see the [releases page](https://github.com/torchgeo/torchgeo/releases).
+
+## Deprecation Policy
+
+TorchGeo follows these deprecation guidelines:
+
+- Deprecated features are marked with `.. deprecated::` in docstrings
+- Deprecation warnings are raised when deprecated features are used
+- Deprecated features are typically removed after 2 minor version releases
+- Breaking changes are documented in release notes
+
+## Citation
+
+If you use TorchGeo in your research, please cite our paper:
+
+```bibtex
+@article{stewart2024torchgeo,
+    author = {Stewart, Adam J. and Robinson, Caleb and Corley, Isaac A. and Ortiz, Anthony and Lavista Ferres, Juan M. and Banerjee, Arindam},
+    title = {{TorchGeo}: Deep Learning With Geospatial Data},
+    journal = {ACM Transactions on Spatial Algorithms and Systems},
+    volume = {11},
+    number = {4},
+    pages = {1--28},
+    month = aug,
+    year = {2025}
+}
+```
+
+## Release Schedule
+
+TorchGeo does not follow a fixed release schedule. New versions are released when:
+
+- Significant new features are added
+- Critical bugs are fixed
+- Breaking changes need to be introduced
+
+Stay updated by:
+
+- Watching the [GitHub repository](https://github.com/torchgeo/torchgeo)
+- Following [@TorchGeo on YouTube](https://www.youtube.com/@TorchGeo)
+- Joining the [TorchGeo Slack](https://torchgeo.slack.com/join/shared_invite/zt-22rse667m-eqtCeNW0yI000Tl4B~2PIw)
+
+## Contributing to Releases
+
+Contributors can help improve TorchGeo releases by:
+
+- Testing release candidates and reporting issues
+- Reviewing pull requests
+- Adding new datasets and features
+- Improving documentation
+- Reporting bugs
+
+See the [Contributing Guide](/community/contributing) for more information on how to get involved.

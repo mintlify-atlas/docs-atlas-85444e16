@@ -1,0 +1,300 @@
+---
+title: Samplers
+description: Sampling strategies for geospatial datasets
+---
+
+Samplers in TorchGeo enable you to sample patches from large geospatial datasets using coordinate-based indexing. They're essential for working with datasets that are too large to fit in memory.
+
+## Overview
+
+Unlike PyTorch's standard `Sampler` which returns integer indices, TorchGeo's `GeoSampler` returns spatiotemporal coordinates (latitude, longitude, time) to uniquely index any `GeoDataset`.
+
+<Info>
+Samplers are particularly useful when working with:
+- Large raster files (e.g., continental-scale CDL data)
+- Time series data from satellites
+- Multi-resolution imagery that needs to be sampled at consistent patch sizes
+</Info>
+
+## Available samplers
+
+### RandomGeoSampler
+
+Samples random patches from a region of interest. Best for training when you want to maximize dataset size.
+
+```python
+from torchgeo.samplers import RandomGeoSampler
+from torchgeo.datasets import Landsat8
+
+dataset = Landsat8(paths="data/landsat")
+
+# Sample 256x256 pixel patches randomly
+sampler = RandomGeoSampler(
+    dataset=dataset,
+    size=256,        # Patch size in pixels
+    length=10000     # Samples per epoch
+)
+```
+
+<Note>
+Randomly sampled chips may overlap. This is intentional to maximize training data.
+</Note>
+
+### GridGeoSampler
+
+Samples patches in a grid pattern with no overlap. Best for inference when you want to cover the entire dataset.
+
+```python
+from torchgeo.samplers import GridGeoSampler
+
+# Sample non-overlapping 512x512 patches
+sampler = GridGeoSampler(
+    dataset=dataset,
+    size=512,
+    stride=512  # No overlap
+)
+```
+
+### PreChippedGeoSampler
+
+For datasets already divided into chips/tiles. Samples entire tiles without further subdivision.
+
+```python
+from torchgeo.samplers import PreChippedGeoSampler
+
+# Sample from pre-chipped dataset
+sampler = PreChippedGeoSampler(dataset, shuffle=True)
+```
+
+### BatchGeoSampler
+
+Samples batches of patches from the same tile. Efficient for tile-based datasets.
+
+```python
+from torchgeo.samplers import RandomBatchGeoSampler
+
+# Sample 4 patches per tile
+sampler = RandomBatchGeoSampler(
+    dataset=dataset,
+    size=256,
+    batch_size=4,
+    length=1000
+)
+```
+
+## Sampler parameters
+
+### Size and units
+
+Specify patch size in pixels or CRS units:
+
+```python
+from torchgeo.samplers import RandomGeoSampler, Units
+
+# Size in pixels (default)
+sampler = RandomGeoSampler(
+    dataset,
+    size=256,
+    units=Units.PIXELS
+)
+
+# Size in CRS units (e.g., meters for UTM)
+sampler = RandomGeoSampler(
+    dataset,
+    size=1000,  # 1000 meters
+    units=Units.CRS
+)
+
+# Different height and width
+sampler = RandomGeoSampler(
+    dataset,
+    size=(256, 512)  # (height, width)
+)
+```
+
+### Region of Interest (ROI)
+
+Limit sampling to a specific geographic area:
+
+```python
+import shapely
+
+# Define ROI as a polygon
+roi = shapely.box(
+    minx=-100.0,  # Longitude
+    miny=40.0,    # Latitude  
+    maxx=-99.0,
+    maxy=41.0
+)
+
+sampler = RandomGeoSampler(
+    dataset,
+    size=256,
+    roi=roi  # Only sample within this region
+)
+```
+
+### Time of Interest (TOI)
+
+Limit sampling to a specific time range:
+
+```python
+import pandas as pd
+from datetime import datetime
+
+# Sample only from summer 2020
+toi = pd.Interval(
+    left=datetime(2020, 6, 1),
+    right=datetime(2020, 8, 31),
+    closed='both'
+)
+
+sampler = RandomGeoSampler(
+    dataset,
+    size=256,
+    toi=toi
+)
+```
+
+## Using samplers with DataLoader
+
+Samplers integrate seamlessly with PyTorch's DataLoader:
+
+```python
+from torch.utils.data import DataLoader
+from torchgeo.datasets import Landsat8, CDL, stack_samples
+from torchgeo.samplers import RandomGeoSampler
+
+# Create dataset
+landsat = Landsat8(paths="data/landsat")
+cdl = CDL(paths="data/cdl")
+dataset = landsat & cdl
+
+# Create sampler
+sampler = RandomGeoSampler(dataset, size=256, length=10000)
+
+# Create dataloader
+dataloader = DataLoader(
+    dataset,
+    batch_size=32,
+    sampler=sampler,
+    collate_fn=stack_samples  # Required for geospatial datasets
+)
+
+# Training loop
+for batch in dataloader:
+    image = batch["image"]  # (32, C, 256, 256)
+    mask = batch["mask"]
+    bbox = batch["bbox"]    # Coordinates of each patch
+```
+
+## Training vs. inference
+
+<Tabs>
+  <Tab title="Training">
+    Use `RandomGeoSampler` to maximize data variation:
+    
+    ```python
+    sampler = RandomGeoSampler(
+        dataset,
+        size=256,
+        length=10000  # More samples than actual tiles
+    )
+    
+    train_loader = DataLoader(
+        dataset,
+        batch_size=32,
+        sampler=sampler,
+        num_workers=4
+    )
+    ```
+  </Tab>
+  
+  <Tab title="Inference">
+    Use `GridGeoSampler` to cover the entire dataset:
+    
+    ```python
+    sampler = GridGeoSampler(
+        dataset,
+        size=512,
+        stride=512  # No overlap
+    )
+    
+    test_loader = DataLoader(
+        dataset,
+        batch_size=4,
+        sampler=sampler,
+        num_workers=2
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Complete example
+
+Here's a full example combining datasets and samplers:
+
+```python
+from torch.utils.data import DataLoader
+from torchgeo.datasets import Landsat8, Sentinel2, stack_samples
+from torchgeo.samplers import RandomGeoSampler
+import shapely
+
+# Load datasets
+landsat = Landsat8(paths="data/landsat")
+sentinel = Sentinel2(paths="data/sentinel")
+
+# Combine for data fusion
+dataset = landsat & sentinel
+
+# Sample from a specific region
+roi = shapely.box(-100, 40, -99, 41)
+
+# Create sampler
+sampler = RandomGeoSampler(
+    dataset,
+    size=256,
+    length=5000,
+    roi=roi
+)
+
+# Create dataloader
+dataloader = DataLoader(
+    dataset,
+    batch_size=16,
+    sampler=sampler,
+    collate_fn=stack_samples,
+    num_workers=4
+)
+
+# Use in training
+for batch in dataloader:
+    landsat_img = batch["image"]  # Landsat bands
+    sentinel_img = batch["image"]  # Sentinel bands (same bbox)
+    # Multimodal fusion...
+```
+
+## Best practices
+
+<Warning>
+**Don't use RandomGeoSampler with tile-based datasets**. Use `RandomBatchGeoSampler` instead for better efficiency.
+</Warning>
+
+<Tip>
+**For validation/testing**, use `GridGeoSampler` with `stride=size` to ensure complete coverage without overlap.
+</Tip>
+
+<Info>
+**Length parameter**: For `RandomGeoSampler`, the default length is approximately the number of non-overlapping chips that could fit in the dataset. You can increase this to see more variation.
+</Info>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Transforms" icon="wand-magic-sparkles" href="/concepts/transforms">
+    Learn about data augmentation
+  </Card>
+  <Card title="Tutorial" icon="book-open" href="/tutorials/geospatial-datasets">
+    Complete tutorial with sampling examples
+  </Card>
+</CardGroup>

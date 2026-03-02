@@ -1,0 +1,442 @@
+---
+title: Lightning CLI
+description: Train models from the command line
+---
+
+TorchGeo supports command-line training using Lightning's CLI. Train models with YAML config files or command-line arguments without writing Python code.
+
+## Installation
+
+The CLI is available after installing TorchGeo:
+
+```bash
+pip install torchgeo
+```
+
+## Basic usage
+
+Invoke the CLI in two ways:
+
+<CodeGroup>
+```bash Installed package
+torchgeo
+```
+
+```bash Python module
+python3 -m torchgeo
+```
+</CodeGroup>
+
+## Available commands
+
+The CLI supports all Lightning training stages:
+
+- `fit`: Train and validate
+- `validate`: Validation only
+- `test`: Test only
+- `predict`: Inference
+
+```bash
+# Train and validate
+torchgeo fit --config config.yaml
+
+# Validate with checkpoint
+torchgeo validate --config config.yaml --ckpt_path=best.ckpt
+
+# Test with checkpoint
+torchgeo test --config config.yaml --ckpt_path=best.ckpt
+```
+
+## Configuration files
+
+### YAML config
+
+Create a YAML file with your training configuration:
+
+```yaml config.yaml
+trainer:
+  max_epochs: 20
+  accelerator: auto
+  devices: 1
+  
+model:
+  class_path: ClassificationTask
+  init_args:
+    model: 'resnet18'
+    in_channels: 13
+    num_classes: 10
+    loss: 'ce'
+    lr: 0.001
+    
+data:
+  class_path: EuroSATDataModule
+  init_args:
+    batch_size: 32
+    num_workers: 4
+  dict_kwargs:
+    download: true
+    root: './data'
+```
+
+Then run:
+
+```bash
+torchgeo fit --config config.yaml
+```
+
+### JSON config
+
+JSON configs are also supported:
+
+```json config.json
+{
+  "trainer": {
+    "max_epochs": 20,
+    "accelerator": "auto"
+  },
+  "model": {
+    "class_path": "ClassificationTask",
+    "init_args": {
+      "model": "resnet18",
+      "in_channels": 13,
+      "num_classes": 10
+    }
+  },
+  "data": {
+    "class_path": "EuroSATDataModule",
+    "init_args": {
+      "batch_size": 32
+    }
+  }
+}
+```
+
+## Command-line arguments
+
+Override config values from the command line:
+
+```bash
+# Override max_epochs
+torchgeo fit --config config.yaml --trainer.max_epochs=50
+
+# Override batch size
+torchgeo fit --config config.yaml --data.init_args.batch_size=64
+
+# Override learning rate
+torchgeo fit --config config.yaml --model.init_args.lr=0.0001
+```
+
+## Getting help
+
+View available options:
+
+```bash
+# See all stages
+torchgeo --help
+
+# See trainer options
+torchgeo fit --help
+
+# See model-specific options
+torchgeo fit --model.help ClassificationTask
+
+# See data-specific options
+torchgeo fit --data.help EuroSATDataModule
+```
+
+## Example configs
+
+### Classification
+
+```yaml classification.yaml
+trainer:
+  max_epochs: 50
+  accelerator: gpu
+  devices: 1
+  
+model:
+  class_path: torchgeo.trainers.ClassificationTask
+  init_args:
+    model: 'resnet50'
+    in_channels: 13
+    num_classes: 10
+    loss: 'ce'
+    lr: 0.001
+    patience: 10
+    
+data:
+  class_path: torchgeo.datamodules.EuroSATDataModule
+  init_args:
+    root: './data'
+    batch_size: 32
+    num_workers: 4
+  dict_kwargs:
+    download: true
+    checksum: true
+```
+
+### Semantic segmentation
+
+```yaml segmentation.yaml
+trainer:
+  max_epochs: 50
+  accelerator: gpu
+  devices: 1
+  precision: 16-mixed
+  
+model:
+  class_path: torchgeo.trainers.SemanticSegmentationTask
+  init_args:
+    model: 'unet'
+    backbone: 'resnet50'
+    weights: true
+    in_channels: 3
+    num_classes: 2
+    loss: 'bce'
+    lr: 0.001
+    
+data:
+  class_path: torchgeo.datamodules.InriaAerialImageLabelingDataModule
+  init_args:
+    root: './data'
+    batch_size: 8
+    num_workers: 6
+  dict_kwargs:
+    download: true
+```
+
+### Multi-GPU training
+
+```yaml multi_gpu.yaml
+trainer:
+  max_epochs: 100
+  accelerator: gpu
+  devices: 4  # Use 4 GPUs
+  strategy: ddp  # Distributed Data Parallel
+  precision: 16-mixed
+  
+model:
+  class_path: torchgeo.trainers.ClassificationTask
+  init_args:
+    model: 'resnet50'
+    in_channels: 13
+    num_classes: 10
+    loss: 'ce'
+    lr: 0.001
+    
+data:
+  class_path: torchgeo.datamodules.BigEarthNetDataModule
+  init_args:
+    root: './data'
+    batch_size: 64  # Per GPU
+    num_workers: 8
+```
+
+### With callbacks
+
+```yaml with_callbacks.yaml
+trainer:
+  max_epochs: 100
+  accelerator: auto
+  devices: 1
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: 'val_accuracy'
+        mode: 'max'
+        save_top_k: 3
+        filename: '{epoch}-{val_accuracy:.2f}'
+    - class_path: lightning.pytorch.callbacks.EarlyStopping
+      init_args:
+        monitor: 'val_loss'
+        patience: 15
+        mode: 'min'
+        
+model:
+  class_path: torchgeo.trainers.ClassificationTask
+  init_args:
+    model: 'resnet18'
+    in_channels: 13
+    num_classes: 10
+    
+data:
+  class_path: torchgeo.datamodules.EuroSATDataModule
+  init_args:
+    batch_size: 32
+```
+
+## Using checkpoints
+
+Resume training from a checkpoint:
+
+```bash
+# Resume training
+torchgeo fit --config config.yaml --ckpt_path=last.ckpt
+
+# Validate with best checkpoint
+torchgeo validate --config config.yaml --ckpt_path=best.ckpt
+
+# Test with specific checkpoint
+torchgeo test --config config.yaml --ckpt_path=epoch=50-val_acc=0.95.ckpt
+```
+
+## Programmatic usage
+
+Use the CLI from Python code:
+
+```python
+from torchgeo.main import main
+
+# Run with config file
+main(["fit", "--config", "config.yaml"])
+
+# Run with arguments
+main([
+    "fit",
+    "--trainer.max_epochs=20",
+    "--model=ClassificationTask",
+    "--model.in_channels=13",
+    "--data=EuroSATDataModule"
+])
+```
+
+## Advanced usage
+
+### Custom logger
+
+```yaml
+trainer:
+  max_epochs: 50
+  logger:
+    - class_path: lightning.pytorch.loggers.TensorBoardLogger
+      init_args:
+        save_dir: 'logs/'
+        name: 'my_experiment'
+    - class_path: lightning.pytorch.loggers.WandbLogger
+      init_args:
+        project: 'torchgeo'
+        name: 'run_1'
+```
+
+### Learning rate finder
+
+```yaml
+trainer:
+  max_epochs: 50
+  auto_lr_find: true  # Automatic LR finding
+```
+
+### Gradient clipping
+
+```yaml
+trainer:
+  max_epochs: 50
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: 'norm'
+```
+
+## Best practices
+
+<Tip>
+**Version control configs**: Store config files in git to reproduce experiments.
+</Tip>
+
+<Warning>
+**Class paths**: Use full class paths (e.g., `torchgeo.trainers.ClassificationTask`) to avoid ambiguity.
+</Warning>
+
+<Info>
+**Override patterns**: Use `--trainer.X` for trainer args, `--model.init_args.X` for model args, and `--data.init_args.X` for data args.
+</Info>
+
+## Complete workflow
+
+<Steps>
+  <Step title="Create config file">
+    ```bash
+    # Create config.yaml with your settings
+    cat > config.yaml << EOF
+    trainer:
+      max_epochs: 50
+    model:
+      class_path: ClassificationTask
+      init_args:
+        model: resnet18
+        in_channels: 13
+        num_classes: 10
+    data:
+      class_path: EuroSATDataModule
+      init_args:
+        batch_size: 32
+    EOF
+    ```
+  </Step>
+  
+  <Step title="Train the model">
+    ```bash
+    torchgeo fit --config config.yaml
+    ```
+  </Step>
+  
+  <Step title="Test on best checkpoint">
+    ```bash
+    # Find best checkpoint
+    best_ckpt=$(ls -t lightning_logs/version_0/checkpoints/*.ckpt | head -1)
+    
+    # Test
+    torchgeo test --config config.yaml --ckpt_path=$best_ckpt
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<Accordion title="Module not found error">
+  Use full class paths:
+  
+  ```yaml
+  model:
+    class_path: torchgeo.trainers.ClassificationTask  # ✓ Good
+    # class_path: ClassificationTask  # ✗ May fail
+  ```
+</Accordion>
+
+<Accordion title="GPU out of memory">
+  Reduce batch size:
+  
+  ```bash
+  torchgeo fit --config config.yaml --data.init_args.batch_size=16
+  ```
+  
+  Or enable mixed precision:
+  
+  ```bash
+  torchgeo fit --config config.yaml --trainer.precision=16-mixed
+  ```
+</Accordion>
+
+<Accordion title="Config validation errors">
+  Check your config syntax:
+  
+  ```bash
+  # Test config validity
+  torchgeo fit --config config.yaml --trainer.fast_dev_run=1
+  ```
+</Accordion>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Trainers" icon="graduation-cap" href="/training/trainers">
+    Learn about available task classes
+  </Card>
+  <Card title="Pre-trained Weights" icon="download" href="/training/pretrained-weights">
+    Use sensor-specific weights
+  </Card>
+  <Card title="Custom Trainers" icon="wrench" href="/training/custom-trainers">
+    Create custom task classes
+  </Card>
+  <Card title="Lightning Docs" icon="link" href="https://lightning.ai/docs/pytorch/stable/cli/lightning_cli.html">
+    Official Lightning CLI documentation
+  </Card>
+</CardGroup>

@@ -1,0 +1,485 @@
+---
+title: Custom trainers
+description: Create custom task classes for specialized training workflows
+---
+
+Create custom trainers to implement specialized loss functions, custom architectures, or novel training procedures not covered by TorchGeo's built-in tasks.
+
+## Extending BaseTask
+
+All TorchGeo trainers extend `BaseTask`, which provides the Lightning infrastructure:
+
+```python
+from torchgeo.trainers import BaseTask
+import torch
+import torch.nn as nn
+
+class MyCustomTask(BaseTask):
+    def __init__(
+        self,
+        model: str = "resnet18",
+        in_channels: int = 3,
+        num_classes: int = 10,
+        lr: float = 1e-3,
+        patience: int = 10,
+        **kwargs
+    ):
+        self.model_name = model
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        self.lr = lr
+        self.patience = patience
+        
+        super().__init__()
+    
+    def configure_models(self) -> None:
+        """Initialize the model."""
+        import timm
+        self.model = timm.create_model(
+            self.model_name,
+            in_chans=self.in_channels,
+            num_classes=self.num_classes
+        )
+    
+    def configure_losses(self) -> None:
+        """Initialize loss functions."""
+        self.criterion = nn.CrossEntropyLoss()
+    
+    def configure_metrics(self) -> None:
+        """Initialize metrics."""
+        from torchmetrics import Accuracy
+        self.train_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+    
+    def training_step(self, batch, batch_idx):
+        """Training step."""
+        x = batch["image"]
+        y = batch["label"]
+        
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        
+        self.log("train_loss", loss, prog_bar=True)
+        self.train_acc(y_hat, y)
+        self.log("train_acc", self.train_acc, prog_bar=True)
+        
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        """Validation step."""
+        x = batch["image"]
+        y = batch["label"]
+        
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        
+        self.log("val_loss", loss, prog_bar=True)
+        self.val_acc(y_hat, y)
+        self.log("val_acc", self.val_acc, prog_bar=True)
+```
+
+## Required methods
+
+Override these methods to customize behavior:
+
+### configure_models()
+
+Initialize your model architecture:
+
+```python
+def configure_models(self) -> None:
+    """Initialize the model."""
+    import timm
+    
+    # Create model
+    self.model = timm.create_model(
+        self.model_name,
+        in_chans=self.in_channels,
+        num_classes=self.num_classes,
+        pretrained=self.use_pretrained
+    )
+    
+    # Optionally modify architecture
+    if self.use_custom_head:
+        self.model.head = nn.Sequential(
+            nn.Linear(self.model.num_features, 512),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(512, self.num_classes)
+        )
+```
+
+### configure_losses()
+
+Initialize loss functions:
+
+```python
+def configure_losses(self) -> None:
+    """Initialize loss criterion."""
+    if self.loss == "ce":
+        self.criterion = nn.CrossEntropyLoss(
+            weight=self.class_weights,
+            ignore_index=self.ignore_index
+        )
+    elif self.loss == "focal":
+        from torchvision.ops import sigmoid_focal_loss
+        self.criterion = sigmoid_focal_loss
+    else:
+        raise ValueError(f"Unknown loss: {self.loss}")
+```
+
+### configure_metrics()
+
+Initialize performance metrics:
+
+```python
+def configure_metrics(self) -> None:
+    """Initialize metrics."""
+    from torchmetrics import MetricCollection, Accuracy, F1Score, Precision, Recall
+    
+    metrics = MetricCollection({
+        "accuracy": Accuracy(task="multiclass", num_classes=self.num_classes),
+        "f1": F1Score(task="multiclass", num_classes=self.num_classes),
+        "precision": Precision(task="multiclass", num_classes=self.num_classes),
+        "recall": Recall(task="multiclass", num_classes=self.num_classes),
+    })
+    
+    self.train_metrics = metrics.clone(prefix="train_")
+    self.val_metrics = metrics.clone(prefix="val_")
+    self.test_metrics = metrics.clone(prefix="test_")
+```
+
+### training_step()
+
+Define the training step:
+
+```python
+def training_step(self, batch, batch_idx):
+    """Execute training step."""
+    x = batch["image"]
+    y = batch["label"]
+    
+    # Forward pass
+    y_hat = self(x)
+    
+    # Compute loss
+    loss = self.criterion(y_hat, y)
+    
+    # Log metrics
+    self.log("train_loss", loss)
+    self.train_metrics(y_hat, y)
+    self.log_dict(self.train_metrics, prog_bar=True)
+    
+    return loss
+```
+
+### validation_step()
+
+Define the validation step:
+
+```python
+def validation_step(self, batch, batch_idx):
+    """Execute validation step."""
+    x = batch["image"]
+    y = batch["label"]
+    
+    y_hat = self(x)
+    loss = self.criterion(y_hat, y)
+    
+    self.log("val_loss", loss, prog_bar=True)
+    self.val_metrics(y_hat, y)
+    self.log_dict(self.val_metrics, prog_bar=True)
+```
+
+## Optional methods
+
+### test_step()
+
+```python
+def test_step(self, batch, batch_idx):
+    """Execute test step."""
+    x = batch["image"]
+    y = batch["label"]
+    
+    y_hat = self(x)
+    loss = self.criterion(y_hat, y)
+    
+    self.log("test_loss", loss)
+    self.test_metrics(y_hat, y)
+    self.log_dict(self.test_metrics)
+```
+
+### predict_step()
+
+```python
+def predict_step(self, batch, batch_idx):
+    """Execute prediction step."""
+    x = batch["image"]
+    return self(x)
+```
+
+### on_after_batch_transfer()
+
+Apply GPU augmentations:
+
+```python
+def on_after_batch_transfer(self, batch, dataloader_idx):
+    """Apply augmentations on GPU."""
+    if self.trainer.training:
+        batch = self.train_augmentations(batch)
+    return batch
+```
+
+## Complete example: Multi-task learning
+
+```python
+from torchgeo.trainers import BaseTask
+import torch
+import torch.nn as nn
+import timm
+from torchmetrics import Accuracy, MeanSquaredError
+
+class MultiTaskTask(BaseTask):
+    """Multi-task learning: classification + regression."""
+    
+    def __init__(
+        self,
+        model: str = "resnet50",
+        in_channels: int = 3,
+        num_classes: int = 10,
+        classification_weight: float = 1.0,
+        regression_weight: float = 1.0,
+        lr: float = 1e-3,
+        patience: int = 10,
+    ):
+        self.model_name = model
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        self.classification_weight = classification_weight
+        self.regression_weight = regression_weight
+        self.lr = lr
+        self.patience = patience
+        
+        super().__init__()
+    
+    def configure_models(self) -> None:
+        """Initialize shared backbone and task heads."""
+        # Shared backbone
+        self.backbone = timm.create_model(
+            self.model_name,
+            in_chans=self.in_channels,
+            num_classes=0,  # Remove head
+            pretrained=True
+        )
+        
+        # Classification head
+        self.classification_head = nn.Linear(
+            self.backbone.num_features,
+            self.num_classes
+        )
+        
+        # Regression head
+        self.regression_head = nn.Sequential(
+            nn.Linear(self.backbone.num_features, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+    
+    def configure_losses(self) -> None:
+        """Initialize losses for both tasks."""
+        self.classification_loss = nn.CrossEntropyLoss()
+        self.regression_loss = nn.MSELoss()
+    
+    def configure_metrics(self) -> None:
+        """Initialize metrics for both tasks."""
+        # Classification metrics
+        self.train_cls_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_cls_acc = Accuracy(task="multiclass", num_classes=self.num_classes)
+        
+        # Regression metrics
+        self.train_reg_mse = MeanSquaredError()
+        self.val_reg_mse = MeanSquaredError()
+    
+    def forward(self, x):
+        """Forward pass through both heads."""
+        features = self.backbone(x)
+        cls_logits = self.classification_head(features)
+        reg_output = self.regression_head(features)
+        return cls_logits, reg_output
+    
+    def training_step(self, batch, batch_idx):
+        """Multi-task training step."""
+        x = batch["image"]
+        cls_target = batch["label"]
+        reg_target = batch["value"]
+        
+        # Forward pass
+        cls_pred, reg_pred = self(x)
+        
+        # Compute losses
+        cls_loss = self.classification_loss(cls_pred, cls_target)
+        reg_loss = self.regression_loss(reg_pred.squeeze(), reg_target)
+        
+        # Weighted combination
+        loss = (
+            self.classification_weight * cls_loss +
+            self.regression_weight * reg_loss
+        )
+        
+        # Log metrics
+        self.log("train_loss", loss)
+        self.log("train_cls_loss", cls_loss)
+        self.log("train_reg_loss", reg_loss)
+        
+        self.train_cls_acc(cls_pred, cls_target)
+        self.train_reg_mse(reg_pred.squeeze(), reg_target)
+        
+        self.log("train_cls_acc", self.train_cls_acc)
+        self.log("train_reg_mse", self.train_reg_mse)
+        
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        """Multi-task validation step."""
+        x = batch["image"]
+        cls_target = batch["label"]
+        reg_target = batch["value"]
+        
+        cls_pred, reg_pred = self(x)
+        
+        cls_loss = self.classification_loss(cls_pred, cls_target)
+        reg_loss = self.regression_loss(reg_pred.squeeze(), reg_target)
+        
+        loss = (
+            self.classification_weight * cls_loss +
+            self.regression_weight * reg_loss
+        )
+        
+        self.log("val_loss", loss, prog_bar=True)
+        self.log("val_cls_loss", cls_loss)
+        self.log("val_reg_loss", reg_loss)
+        
+        self.val_cls_acc(cls_pred, cls_target)
+        self.val_reg_mse(reg_pred.squeeze(), reg_target)
+        
+        self.log("val_cls_acc", self.val_cls_acc, prog_bar=True)
+        self.log("val_reg_mse", self.val_reg_mse)
+
+# Usage
+task = MultiTaskTask(
+    model="resnet50",
+    in_channels=13,
+    num_classes=10,
+    classification_weight=1.0,
+    regression_weight=0.5
+)
+
+trainer = Trainer(max_epochs=50)
+trainer.fit(task, datamodule)
+```
+
+## Custom optimizers
+
+Override `configure_optimizers()`:
+
+```python
+def configure_optimizers(self):
+    """Custom optimizer and scheduler."""
+    from torch.optim import SGD
+    from torch.optim.lr_scheduler import CosineAnnealingLR
+    
+    # Different learning rates for backbone and heads
+    params = [
+        {"params": self.backbone.parameters(), "lr": self.lr * 0.1},
+        {"params": self.classification_head.parameters(), "lr": self.lr},
+    ]
+    
+    optimizer = SGD(params, momentum=0.9, weight_decay=1e-4)
+    scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs)
+    
+    return {
+        "optimizer": optimizer,
+        "lr_scheduler": {
+            "scheduler": scheduler,
+            "interval": "epoch"
+        }
+    }
+```
+
+## Custom augmentations
+
+```python
+def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    
+    # Define augmentations
+    import kornia.augmentation as K
+    from kornia.augmentation import AugmentationSequential
+    
+    self.augmentations = AugmentationSequential(
+        K.RandomHorizontalFlip(p=0.5),
+        K.RandomVerticalFlip(p=0.5),
+        K.ColorJitter(brightness=0.2, contrast=0.2, p=0.5),
+        data_keys=["image", "mask"]
+    )
+
+def on_after_batch_transfer(self, batch, dataloader_idx):
+    """Apply augmentations on GPU."""
+    if self.trainer.training:
+        batch["image"], batch["mask"] = self.augmentations(
+            batch["image"],
+            batch["mask"].float().unsqueeze(1)
+        )
+        batch["mask"] = batch["mask"].squeeze(1).long()
+    return batch
+```
+
+## Best practices
+
+<Tip>
+**Save hyperparameters**: Call `self.save_hyperparameters()` in `__init__` to automatically log all arguments.
+</Tip>
+
+<Warning>
+**Call super().__init__()**: Always call parent constructor after setting attributes needed by `configure_*` methods.
+</Warning>
+
+<Info>
+**Metric logging**: Use `self.log()` for scalars and `self.log_dict()` for dictionaries of metrics.
+</Info>
+
+## Testing your custom task
+
+```python
+from lightning.pytorch import Trainer
+from torchgeo.datamodules import EuroSATDataModule
+
+# Create task
+task = MyCustomTask(
+    model="resnet18",
+    in_channels=13,
+    num_classes=10
+)
+
+# Quick validation
+trainer = Trainer(fast_dev_run=True)
+datamodule = EuroSATDataModule(root="data", batch_size=4)
+trainer.fit(task, datamodule)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Trainers" icon="graduation-cap" href="/training/trainers">
+    Learn about built-in trainers
+  </Card>
+  <Card title="Lightning Docs" icon="link" href="https://lightning.ai/docs/pytorch/stable/">
+    Official Lightning documentation
+  </Card>
+  <Card title="BaseTask API" icon="code" href="/api/trainers#basetask">
+    BaseTask API reference
+  </Card>
+  <Card title="GitHub Examples" icon="github" href="https://github.com/torchgeo/torchgeo/tree/main/torchgeo/trainers">
+    View source code of built-in trainers
+  </Card>
+</CardGroup>

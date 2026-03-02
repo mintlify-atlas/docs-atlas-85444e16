@@ -1,0 +1,195 @@
+---
+title: Working with Geospatial Datasets
+description: Learn how to combine and sample from geospatial datasets using TorchGeo
+---
+
+Geospatial datasets in TorchGeo contain geographic metadata like coordinates, CRS, and resolution. This tutorial shows you how to combine multiple datasets and sample patches from them.
+
+## Overview
+
+Unlike benchmark datasets with pre-defined chips, geospatial datasets often contain very large images covering entire regions. TorchGeo makes it easy to:
+
+- Combine datasets from multiple sensors (e.g., Landsat 7 and 8)
+- Intersect imagery with labels (e.g., Landsat and CDL)
+- Sample small patches using geospatial coordinates
+- Automatically handle different CRS and resolutions
+
+## Complete Example
+
+<Steps>
+
+<Step title="Import required modules">
+
+First, import the necessary classes from TorchGeo:
+
+```python
+from torch.utils.data import DataLoader
+from torchgeo.datasets import CDL, Landsat7, Landsat8, stack_samples
+from torchgeo.samplers import RandomGeoSampler
+```
+
+</Step>
+
+<Step title="Load Landsat datasets">
+
+Create datasets for Landsat 7 and Landsat 8. Since Landsat 8 has more spectral bands, we'll only use bands common to both:
+
+```python
+# Landsat 7 has bands B1-B7
+landsat7 = Landsat7(
+    paths="path/to/landsat7",
+    bands=["B1", "B2", "B3", "B4", "B5", "B7"]  # Skipping thermal B6
+)
+
+# Landsat 8 bands are numbered differently (B2-B8 correspond to L7's B1-B7)
+landsat8 = Landsat8(
+    paths="path/to/landsat8",
+    bands=["B2", "B3", "B4", "B5", "B6", "B7"]  # Matching L7 bands
+)
+```
+
+</Step>
+
+<Step title="Combine datasets with union operator">
+
+Use the `|` operator to create a union dataset. This treats both Landsat missions as equivalent:
+
+```python
+# Union: queries present in at least one dataset
+landsat = landsat7 | landsat8
+
+print(f"Combined dataset bounds: {landsat.bounds}")
+print(f"Number of files: {len(landsat)}")
+```
+
+The union operator is useful for:
+- Combining multiple sensors of the same type
+- Combining datasets from different geographic regions
+
+</Step>
+
+<Step title="Add labels with intersection operator">
+
+Use the `&` operator to intersect with the Cropland Data Layer (CDL) for labels:
+
+```python
+# CDL provides crop classification labels
+cdl = CDL(
+    paths="path/to/cdl",
+    download=True,  # Automatically download if needed
+    checksum=True   # Verify data integrity
+)
+
+# Intersection: queries must be present in both datasets
+dataset = landsat & cdl
+```
+
+TorchGeo automatically:
+- Reprojects datasets to a common CRS
+- Resamples to a common resolution
+- Ensures spatial and temporal overlap
+
+</Step>
+
+<Step title="Create a random sampler">
+
+Use `RandomGeoSampler` to randomly sample 256×256 pixel patches:
+
+```python
+sampler = RandomGeoSampler(
+    dataset,
+    size=256,        # Patch size in pixels
+    length=10000     # Number of samples per epoch
+)
+```
+
+The sampler returns geospatial slices like `[xmin:xmax, ymin:ymax, tmin:tmax]` that index into the dataset.
+
+</Step>
+
+<Step title="Create a dataloader">
+
+Use `stack_samples` to collate individual samples into batches:
+
+```python
+dataloader = DataLoader(
+    dataset,
+    batch_size=128,
+    sampler=sampler,
+    collate_fn=stack_samples,  # Combines sample dicts into batches
+    num_workers=4
+)
+```
+
+</Step>
+
+<Step title="Train your model">
+
+Iterate through the dataloader to train a model:
+
+```python
+for batch in dataloader:
+    image = batch["image"]  # Shape: [B, C, H, W]
+    mask = batch["mask"]    # Shape: [B, H, W]
+
+    # image contains Landsat spectral bands
+    # mask contains CDL crop classification labels
+
+    # Train your model here
+    predictions = model(image)
+    loss = criterion(predictions, mask)
+    loss.backward()
+```
+
+</Step>
+
+</Steps>
+
+## Union vs Intersection
+
+### Union Operator (`|`)
+
+Combines datasets where queries must be present in **at least one** dataset:
+
+```python
+# Combine different sensors
+landsat = landsat7 | landsat8
+
+# Combine different regions
+chesapeake = chesapeake_ny | chesapeake_pa
+```
+
+### Intersection Operator (`&`)
+
+Combines datasets where queries must be present in **both** datasets:
+
+```python
+# Combine imagery with labels
+dataset = landsat & cdl
+
+# Multimodal learning
+dataset = landsat & sentinel2
+
+# Add auxiliary data
+dataset = landsat & elevation
+```
+
+## Working with CRS and Resolution
+
+TorchGeo automatically handles coordinate reference systems and resolutions:
+
+```python
+landsat7 = Landsat7(paths="...", crs="EPSG:32615", res=30)
+cdl = CDL(paths="...")  # May have different CRS/resolution
+
+# When combined, cdl is automatically reprojected to match landsat7
+dataset = landsat7 & cdl
+print(dataset.crs)  # EPSG:32615
+print(dataset.res)  # (30.0, 30.0)
+```
+
+## Next Steps
+
+- Learn about [benchmark datasets](/tutorials/benchmark-datasets) for pre-defined train/test splits
+- Explore [custom RasterDataset](/tutorials/custom-raster-dataset) for your own data
+- See [pre-trained weights](/tutorials/pretrained-weights) for transfer learning

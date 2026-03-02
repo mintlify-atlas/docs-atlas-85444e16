@@ -1,0 +1,352 @@
+---
+title: Computing Spectral Indices
+description: Calculate vegetation, water, and other spectral indices from multispectral imagery
+---
+
+Spectral indices are mathematical combinations of spectral bands that highlight specific features like vegetation, water, or built-up areas. TorchGeo provides transforms for computing common indices from multispectral imagery.
+
+## Overview
+
+TorchGeo includes transforms for computing:
+
+- **Vegetation indices**: NDVI, GNDVI, NDRE, etc.
+- **Water indices**: NDWI, SWI
+- **Urban indices**: NDBI
+- **Other indices**: NBR (burn ratio), NDSI (snow)
+
+All index transforms are implemented as Kornia augmentations and can be used in GPU-accelerated pipelines.
+
+## Complete Example
+
+<Steps>
+
+<Step title="Import required modules">
+
+```python
+import torch
+from torchgeo.transforms import AppendNDVI, AppendNDWI
+from torchgeo.datasets import EuroSAT
+from torch.utils.data import DataLoader
+```
+
+</Step>
+
+<Step title="Understanding band indices">
+
+Spectral indices require you to specify which bands to use:
+
+```python
+# Sentinel-2 band order (EuroSAT dataset)
+# B01, B02, B03, B04, B05, B06, B07, B08, B8A, B09, B10, B11, B12
+#  0    1    2    3    4    5    6    7    8    9    10   11   12
+
+# For NDVI, we need:
+# - NIR (Near Infrared): B08 = index 7
+# - Red: B04 = index 3
+
+# For NDWI, we need:
+# - Green: B03 = index 2
+# - NIR: B08 = index 7
+```
+
+</Step>
+
+<Step title="Create transforms for indices">
+
+Define transforms that append indices to your imagery:
+
+```python
+# NDVI: (NIR - Red) / (NIR + Red)
+# Highlights vegetation (higher values = more vegetation)
+ndvi_transform = AppendNDVI(
+    index_nir=7,  # B08
+    index_red=3   # B04
+)
+
+# NDWI: (Green - NIR) / (Green + NIR)
+# Highlights water bodies (higher values = more water)
+ndwi_transform = AppendNDWI(
+    index_green=2,  # B03
+    index_nir=7     # B08
+)
+```
+
+</Step>
+
+<Step title="Apply to a dataset">
+
+Use the transforms when loading data:
+
+```python
+from torchgeo.datasets import EuroSAT
+
+def add_indices(sample):
+    """Add NDVI and NDWI to the sample."""
+    image = sample["image"]
+
+    # Append NDVI (adds 1 channel)
+    image = ndvi_transform(image.unsqueeze(0)).squeeze(0)
+
+    # Append NDWI (adds 1 channel)
+    image = ndwi_transform(image.unsqueeze(0)).squeeze(0)
+
+    sample["image"] = image
+    return sample
+
+# Load dataset with indices
+dataset = EuroSAT(
+    root="data",
+    split="train",
+    transforms=add_indices
+)
+
+sample = dataset[0]
+print(f"Original bands: 13")
+print(f"With indices: {sample['image'].shape[0]}")  # 15 (13 + NDVI + NDWI)
+```
+
+</Step>
+
+<Step title="Visualize the indices">
+
+```python
+import matplotlib.pyplot as plt
+import torch
+
+sample = dataset[0]
+image = sample["image"]
+
+# Extract indices
+ndvi = image[13]  # NDVI is the 14th channel (index 13)
+ndwi = image[14]  # NDWI is the 15th channel (index 14)
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+# Plot NDVI
+axes[0].imshow(ndvi, cmap="RdYlGn", vmin=-1, vmax=1)
+axes[0].set_title("NDVI (Vegetation)")
+axes[0].axis("off")
+
+# Plot NDWI
+axes[1].imshow(ndwi, cmap="Blues", vmin=-1, vmax=1)
+axes[1].set_title("NDWI (Water)")
+axes[1].axis("off")
+
+plt.tight_layout()
+plt.show()
+```
+
+</Step>
+
+<Step title="Use in training">
+
+Indices can improve model performance:
+
+```python
+import timm
+import torch.nn as nn
+from torch.utils.data import DataLoader
+
+# Model with 15 input channels (13 bands + 2 indices)
+model = timm.create_model(
+    "resnet18",
+    in_chans=15,  # Original 13 + NDVI + NDWI
+    num_classes=10
+)
+
+# Train as usual
+dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters())
+
+for batch in dataloader:
+    images = batch["image"].cuda()
+    labels = batch["label"].cuda()
+
+    outputs = model(images)
+    loss = criterion(outputs, labels)
+    loss.backward()
+    optimizer.step()
+    optimizer.zero_grad()
+```
+
+</Step>
+
+</Steps>
+
+## Available Indices
+
+### Vegetation Indices
+
+**NDVI** - Normalized Difference Vegetation Index
+```python
+from torchgeo.transforms import AppendNDVI
+
+ndvi = AppendNDVI(index_nir=7, index_red=3)
+# Formula: (NIR - Red) / (NIR + Red)
+# Range: -1 to 1 (higher = more vegetation)
+```
+
+**GNDVI** - Green Normalized Difference Vegetation Index
+```python
+from torchgeo.transforms import AppendGNDVI
+
+gndvi = AppendGNDVI(index_nir=7, index_green=2)
+# Formula: (NIR - Green) / (NIR + Green)
+# Better for high biomass areas
+```
+
+**NDRE** - Normalized Difference Red Edge Index
+```python
+from torchgeo.transforms import AppendNDRE
+
+ndre = AppendNDRE(index_nir=7, index_vre1=4)  # VRE1 = B05
+# Formula: (NIR - RedEdge) / (NIR + RedEdge)
+# Sensitive to chlorophyll content
+```
+
+### Water Indices
+
+**NDWI** - Normalized Difference Water Index
+```python
+from torchgeo.transforms import AppendNDWI
+
+ndwi = AppendNDWI(index_green=2, index_nir=7)
+# Formula: (Green - NIR) / (Green + NIR)
+# Highlights open water
+```
+
+**SWI** - Standardized Water-Level Index
+```python
+from torchgeo.transforms import AppendSWI
+
+swi = AppendSWI(index_vre1=4, index_swir2=11)  # SWIR2 = B11
+# Formula: (VRE1 - SWIR2) / (VRE1 + SWIR2)
+```
+
+### Urban and Other Indices
+
+**NDBI** - Normalized Difference Built-up Index
+```python
+from torchgeo.transforms import AppendNDBI
+
+ndbi = AppendNDBI(index_swir=11, index_nir=7)  # SWIR = B11
+# Formula: (SWIR - NIR) / (SWIR + NIR)
+# Highlights urban/built-up areas
+```
+
+**NBR** - Normalized Burn Ratio
+```python
+from torchgeo.transforms import AppendNBR
+
+nbr = AppendNBR(index_nir=7, index_swir=11)
+# Formula: (NIR - SWIR) / (NIR + SWIR)
+# Used for burn severity mapping
+```
+
+**NDSI** - Normalized Difference Snow Index
+```python
+from torchgeo.transforms import AppendNDSI
+
+ndsi = AppendNDSI(index_green=2, index_swir=11)
+# Formula: (Green - SWIR) / (Green + SWIR)
+# Highlights snow and ice
+```
+
+## Multi-Band Indices
+
+Some indices use three bands:
+
+```python
+from torchgeo.transforms import AppendGRNDVI
+
+# Green-Red NDVI: (NIR - (Green + Red)) / (NIR + (Green + Red))
+grndvi = AppendGRNDVI(
+    index_nir=7,
+    index_green=2,
+    index_red=3
+)
+```
+
+Other three-band indices:
+- `AppendGBNDVI`: Green-Blue NDVI
+- `AppendRBNDVI`: Red-Blue NDVI
+
+## Custom Indices
+
+Create your own normalized difference index:
+
+```python
+from torchgeo.transforms import AppendNormalizedDifferenceIndex
+
+# Custom index: (Band A - Band B) / (Band A + Band B)
+custom_index = AppendNormalizedDifferenceIndex(
+    index_a=7,  # First band
+    index_b=11  # Second band
+)
+```
+
+Or three-band indices:
+
+```python
+from torchgeo.transforms import AppendTriBandNormalizedDifferenceIndex
+
+# Custom: (A - (B + C)) / (A + (B + C))
+custom_3band = AppendTriBandNormalizedDifferenceIndex(
+    index_a=7,
+    index_b=2,
+    index_c=3
+)
+```
+
+## GPU Acceleration
+
+Indices are Kornia transforms and can run on GPU:
+
+```python
+import torch
+from torchgeo.transforms import AppendNDVI
+
+# Create transform
+ndvi = AppendNDVI(index_nir=7, index_red=3)
+
+# Move data to GPU
+images = batch["image"].cuda()  # [B, C, H, W]
+
+# Compute on GPU
+images_with_ndvi = ndvi(images)  # [B, C+1, H, W]
+```
+
+## Batch Processing
+
+Process entire batches efficiently:
+
+```python
+from torch.utils.data import DataLoader
+from torchgeo.transforms import AppendNDVI, AppendNDWI
+import kornia.augmentation as K
+
+# Combine multiple indices
+augmentations = K.AugmentationSequential(
+    AppendNDVI(index_nir=7, index_red=3),
+    AppendNDWI(index_green=2, index_nir=7),
+    data_keys=["image"]
+)
+
+dataloader = DataLoader(dataset, batch_size=64)
+
+for batch in dataloader:
+    images = batch["image"].cuda()
+
+    # Apply all indices at once
+    images = augmentations(images)  # Now has 2 extra channels
+
+    # Train your model
+    outputs = model(images)
+```
+
+## Next Steps
+
+- Learn about [transforms](/tutorials/transforms) for data augmentation
+- Use indices with [geospatial datasets](/tutorials/geospatial-datasets)
+- Apply [pre-trained weights](/tutorials/pretrained-weights) to your models

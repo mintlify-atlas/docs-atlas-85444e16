@@ -1,0 +1,183 @@
+---
+title: Datasets Overview
+description: Introduction to TorchGeo datasets for geospatial machine learning
+---
+
+TorchGeo provides a comprehensive collection of datasets for geospatial machine learning. These datasets are divided into two main categories based on whether they contain geospatial metadata.
+
+## Dataset Categories
+
+<CardGroup cols={2}>
+  <Card title="Geospatial Datasets" icon="map" href="/api/datasets/geospatial">
+    Datasets with coordinate information that can be spatially indexed and combined
+  </Card>
+  <Card title="Non-Geospatial Datasets" icon="image" href="/api/datasets/non-geospatial">
+    Benchmark datasets with pre-defined image chips for various computer vision tasks
+  </Card>
+</CardGroup>
+
+## Key Differences
+
+### Geospatial Datasets
+
+Geospatial datasets (`GeoDataset`) contain rich geospatial metadata including:
+
+- Coordinates (latitude, longitude)
+- Coordinate Reference System (CRS)
+- Resolution
+- Temporal information
+
+This metadata enables powerful spatial operations:
+
+```python
+from torchgeo.datasets import Landsat8, CDL
+
+# Load geospatial datasets
+landsat = Landsat8(paths='data/landsat')
+cdl = CDL(paths='data/cdl')
+
+# Combine using spatial intersection
+dataset = landsat & cdl
+
+# Query by bounding box and time
+sample = dataset[xmin:xmax:xres, ymin:ymax:yres, tmin:tmax]
+```
+
+### Non-Geospatial Datasets
+
+Non-geospatial datasets (`NonGeoDataset`) are pre-chipped benchmark datasets without coordinate information:
+
+```python
+from torchgeo.datasets import EuroSAT
+from torch.utils.data import DataLoader
+
+# Load benchmark dataset
+dataset = EuroSAT(root='data/eurosat', split='train', download=True)
+
+# Use with standard PyTorch DataLoader
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+for sample in dataloader:
+    image = sample['image']  # [B, C, H, W]
+    label = sample['label']  # [B]
+```
+
+## Common Patterns
+
+### Combining Geospatial Datasets
+
+TorchGeo provides two operators for combining geospatial datasets:
+
+**Intersection (`&`)**: Samples must exist in both datasets
+```python
+# Combine image and labels from same location
+dataset = imagery & labels
+```
+
+**Union (`|`)**: Samples can exist in either dataset
+```python
+# Combine data from different sensors or locations
+dataset = landsat7 | landsat8
+```
+
+### Sampling Strategies
+
+For geospatial datasets, use samplers to generate random queries:
+
+```python
+from torchgeo.samplers import RandomGeoSampler
+from torch.utils.data import DataLoader
+
+sampler = RandomGeoSampler(dataset, size=256, length=1000)
+dataloader = DataLoader(dataset, sampler=sampler, batch_size=4)
+```
+
+### Transforms
+
+All datasets support transforms for data augmentation:
+
+```python
+import kornia.augmentation as K
+from torchgeo.transforms import AugmentationSequential
+
+transforms = AugmentationSequential(
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    data_keys=['image', 'mask']
+)
+
+dataset = MyDataset(paths='data', transforms=transforms)
+```
+
+## Common Parameters
+
+Most datasets share these common parameters:
+
+<ParamField path="root" type="str | PathLike" default="'data'">
+  Root directory where dataset is stored (for NonGeoDatasets)
+</ParamField>
+
+<ParamField path="paths" type="str | PathLike | Iterable[str | PathLike]" default="'data'">
+  One or more root directories to search or files to load (for GeoDatasets)
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Function to transform samples after loading
+</ParamField>
+
+<ParamField path="download" type="bool" default="False">
+  If True, download dataset if not found (for benchmark datasets)
+</ParamField>
+
+<ParamField path="checksum" type="bool" default="False">
+  If True, verify file integrity using MD5 checksums
+</ParamField>
+
+## Sample Format
+
+All datasets return samples as dictionaries with standardized keys:
+
+**Image datasets**:
+```python
+{
+    'image': Tensor,      # [C, H, W] or [T, C, H, W]
+    'bounds': Tensor,     # Spatiotemporal bounds (GeoDatasets only)
+    'transform': Tensor   # Affine transform matrix (GeoDatasets only)
+}
+```
+
+**Segmentation datasets**:
+```python
+{
+    'image': Tensor,  # [C, H, W]
+    'mask': Tensor    # [H, W] or [C, H, W]
+}
+```
+
+**Classification datasets**:
+```python
+{
+    'image': Tensor,  # [C, H, W]
+    'label': Tensor   # Scalar or [1]
+}
+```
+
+**Object detection datasets**:
+```python
+{
+    'image': Tensor,      # [C, H, W]
+    'bbox_xyxy': Tensor,  # [N, 4]
+    'label': Tensor       # [N]
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Geospatial Datasets" icon="map" href="/api/datasets/geospatial">
+    Explore RasterDataset, VectorDataset, and other geospatial base classes
+  </Card>
+  <Card title="Non-Geospatial Datasets" icon="image" href="/api/datasets/non-geospatial">
+    Browse benchmark datasets for classification, segmentation, and detection
+  </Card>
+</CardGroup>

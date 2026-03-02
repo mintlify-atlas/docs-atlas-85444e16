@@ -1,0 +1,415 @@
+---
+title: Data Augmentation and Transforms
+description: Apply augmentations and preprocessing to geospatial data
+---
+
+TorchGeo integrates with Kornia for GPU-accelerated data augmentation. This tutorial shows you how to apply transforms to geospatial imagery in PyTorch Lightning modules.
+
+## Overview
+
+TorchGeo uses:
+
+- **Kornia** for GPU-accelerated geometric and photometric augmentations
+- **PyTorch Lightning** for proper augmentation placement
+- **Custom transforms** for geospatial-specific operations
+
+Key concepts:
+- CPU transforms in dataset `transforms` parameter
+- GPU transforms in `on_after_batch_transfer` hook
+- Proper handling of masks and labels
+
+## Complete Example
+
+<Steps>
+
+<Step title="Import required modules">
+
+```python
+import kornia.augmentation as K
+import torch
+import torch.nn as nn
+from lightning.pytorch import LightningModule, Trainer
+from torch.utils.data import DataLoader
+from torchgeo.datasets import EuroSAT
+from torchgeo.transforms import AppendNDVI
+```
+
+</Step>
+
+<Step title="Create a Lightning module with transforms">
+
+```python
+class ClassificationTask(LightningModule):
+    """Image classification with augmentations."""
+
+    def __init__(self, num_classes=10):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Conv2d(13, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(64, num_classes)
+        )
+        self.loss = nn.CrossEntropyLoss()
+
+        # Define augmentations for training
+        self.train_aug = K.AugmentationSequential(
+            # Geometric transforms
+            K.RandomRotation(p=0.5, degrees=90),
+            K.RandomHorizontalFlip(p=0.5),
+            K.RandomVerticalFlip(p=0.5),
+
+            # Photometric transforms
+            K.RandomGaussianBlur(p=0.25, kernel_size=(3, 3)),
+            K.ColorJitter(p=0.25, brightness=0.1, contrast=0.1, saturation=0.1),
+
+            data_keys=["image"],  # Only augment images, not labels
+            same_on_batch=False
+        )
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        """Apply GPU augmentations after batch transfer."""
+        if self.training:
+            # Augment on GPU during training
+            batch["image"] = self.train_aug(batch["image"])
+        return batch
+
+    def training_step(self, batch, batch_idx):
+        x = batch["image"]
+        y = batch["label"]
+        y_hat = self.model(x)
+        loss = self.loss(y_hat, y)
+        self.log("train_loss", loss)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x = batch["image"]
+        y = batch["label"]
+        y_hat = self.model(x)
+        loss = self.loss(y_hat, y)
+        self.log("val_loss", loss)
+        return loss
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=1e-3)
+```
+
+</Step>
+
+<Step title="Create datasets and dataloaders">
+
+```python
+# Training dataset
+train_dataset = EuroSAT(root="data", split="train")
+train_loader = DataLoader(
+    train_dataset,
+    batch_size=64,
+    shuffle=True,
+    num_workers=4
+)
+
+# Validation dataset (no augmentation)
+val_dataset = EuroSAT(root="data", split="val")
+val_loader = DataLoader(
+    val_dataset,
+    batch_size=64,
+    shuffle=False,
+    num_workers=4
+)
+```
+
+</Step>
+
+<Step title="Train the model">
+
+```python
+# Create task and trainer
+task = ClassificationTask(num_classes=10)
+trainer = Trainer(max_epochs=20, accelerator="gpu", devices=1)
+
+# Train
+trainer.fit(
+    model=task,
+    train_dataloaders=train_loader,
+    val_dataloaders=val_loader
+)
+```
+
+</Step>
+
+</Steps>
+
+## Segmentation with Mask Augmentation
+
+For segmentation tasks, augment both images and masks:
+
+```python
+import kornia.augmentation as K
+from lightning.pytorch import LightningModule
+
+class SegmentationTask(LightningModule):
+    """Semantic segmentation with augmentations."""
+
+    def __init__(self):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Conv2d(3, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 10, 1)  # 10 classes
+        )
+        self.loss = nn.CrossEntropyLoss()
+
+        # Augment both images and masks
+        self.train_aug = K.AugmentationSequential(
+            K.RandomRotation(p=0.5, degrees=90),
+            K.RandomHorizontalFlip(p=0.5),
+            K.RandomVerticalFlip(p=0.5),
+            K.ColorJitter(p=0.25, brightness=0.1, contrast=0.1),
+
+            # Specify which tensors to augment
+            data_keys=["input", "mask"],
+            same_on_batch=False
+        )
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        """Apply augmentations to images and masks."""
+        if self.training:
+            # Masks need to be float for Kornia
+            mask = batch["mask"].float()
+
+            # Add channel dimension for Kornia
+            if mask.ndim == 3:
+                mask = mask.unsqueeze(1)
+
+            # Augment
+            batch["image"], mask = self.train_aug(
+                batch["image"],
+                mask
+            )
+
+            # Remove channel dimension and convert back to long
+            batch["mask"] = mask.squeeze(1).long()
+
+        return batch
+
+    def training_step(self, batch, batch_idx):
+        x = batch["image"]
+        y = batch["mask"]
+        y_hat = self.model(x)
+        loss = self.loss(y_hat, y)
+        self.log("train_loss", loss)
+        return loss
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters())
+```
+
+## Common Augmentations
+
+### Geometric Transforms
+
+```python
+import kornia.augmentation as K
+
+transforms = K.AugmentationSequential(
+    # Rotation
+    K.RandomRotation(p=0.5, degrees=90),
+
+    # Flips
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+
+    # Cropping
+    K.RandomResizedCrop(size=(256, 256), scale=(0.8, 1.0), p=0.5),
+
+    # Affine transforms
+    K.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1), p=0.5),
+
+    data_keys=["input", "mask"]
+)
+```
+
+### Photometric Transforms
+
+```python
+import kornia.augmentation as K
+
+transforms = K.AugmentationSequential(
+    # Color jittering
+    K.ColorJitter(
+        brightness=0.1,
+        contrast=0.1,
+        saturation=0.1,
+        hue=0.1,
+        p=0.5
+    ),
+
+    # Blur
+    K.RandomGaussianBlur(kernel_size=(3, 3), sigma=(0.1, 2.0), p=0.25),
+
+    # Noise
+    K.RandomGaussianNoise(mean=0.0, std=0.01, p=0.25),
+
+    # Normalization (always apply)
+    K.Normalize(
+        mean=torch.tensor([0.485, 0.456, 0.406]),
+        std=torch.tensor([0.229, 0.224, 0.225])
+    ),
+
+    data_keys=["image"]
+)
+```
+
+### Geospatial-Specific Transforms
+
+```python
+from torchgeo.transforms import AppendNDVI, RandomGrayscale
+import kornia.augmentation as K
+
+# Combine spectral indices with augmentations
+transforms = K.AugmentationSequential(
+    # Add vegetation index
+    AppendNDVI(index_nir=7, index_red=3),
+
+    # Random grayscale (for RGB bands)
+    RandomGrayscale(p=0.1),
+
+    # Standard augmentations
+    K.RandomRotation(p=0.5, degrees=90),
+    K.RandomHorizontalFlip(p=0.5),
+
+    data_keys=["image"]
+)
+```
+
+## CPU vs GPU Augmentations
+
+### CPU Augmentations (in Dataset)
+
+Use for:
+- Spectral index computation
+- Normalization with dataset statistics
+- Operations that don't benefit from GPU
+
+```python
+def cpu_transforms(sample):
+    """Apply on CPU during data loading."""
+    # Add spectral index
+    ndvi = AppendNDVI(index_nir=7, index_red=3)
+    sample["image"] = ndvi(sample["image"].unsqueeze(0)).squeeze(0)
+
+    return sample
+
+dataset = EuroSAT(root="data", split="train", transforms=cpu_transforms)
+```
+
+### GPU Augmentations (in Lightning Module)
+
+Use for:
+- Geometric transforms (rotation, flips, crops)
+- Photometric transforms (color jitter, blur)
+- Any batch operations
+
+```python
+class Task(LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.aug = K.AugmentationSequential(
+            K.RandomRotation(p=0.5, degrees=90),
+            K.ColorJitter(p=0.25, brightness=0.1),
+            data_keys=["image"]
+        )
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        if self.training:
+            batch["image"] = self.aug(batch["image"])
+        return batch
+```
+
+## Advanced: Test-Time Augmentation
+
+Improve predictions with test-time augmentation:
+
+```python
+import kornia.augmentation as K
+
+class TaskWithTTA(LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.model = ...  # Your model
+
+        # TTA transforms
+        self.tta_transforms = [
+            lambda x: x,  # No transform
+            K.HorizontalFlip(),
+            K.VerticalFlip(),
+            K.Rotate(90),
+        ]
+
+    def predict_step(self, batch, batch_idx):
+        """Predict with test-time augmentation."""
+        x = batch["image"]
+        predictions = []
+
+        for transform in self.tta_transforms:
+            # Apply transform
+            x_aug = transform(x)
+
+            # Predict
+            pred = self.model(x_aug)
+
+            # Inverse transform (if needed)
+            # pred = inverse_transform(pred)
+
+            predictions.append(pred)
+
+        # Average predictions
+        return torch.stack(predictions).mean(dim=0)
+```
+
+## Mixing Augmentations
+
+Combine multiple augmentation strategies:
+
+```python
+import kornia.augmentation as K
+from torchgeo.transforms import AppendNDVI
+
+class MultiAugTask(LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.model = ...
+
+        # Weak augmentation
+        self.weak_aug = K.AugmentationSequential(
+            K.RandomHorizontalFlip(p=0.5),
+            K.RandomVerticalFlip(p=0.5),
+            data_keys=["image"]
+        )
+
+        # Strong augmentation
+        self.strong_aug = K.AugmentationSequential(
+            K.RandomRotation(p=0.8, degrees=90),
+            K.ColorJitter(p=0.8, brightness=0.2, contrast=0.2),
+            K.RandomGaussianBlur(p=0.5, kernel_size=(5, 5)),
+            data_keys=["image"]
+        )
+
+    def on_after_batch_transfer(self, batch, dataloader_idx):
+        if self.training:
+            # Apply weak to all
+            batch["image"] = self.weak_aug(batch["image"])
+
+            # Apply strong to 50% of batch
+            if torch.rand(1) > 0.5:
+                batch["image"] = self.strong_aug(batch["image"])
+
+        return batch
+```
+
+## Next Steps
+
+- Compute [spectral indices](/tutorials/indices) to enhance features
+- Use [pre-trained weights](/tutorials/pretrained-weights) with augmented data
+- Apply transforms to [geospatial datasets](/tutorials/geospatial-datasets)

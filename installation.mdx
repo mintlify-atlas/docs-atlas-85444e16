@@ -1,0 +1,244 @@
+---
+title: Installation
+description: Install TorchGeo using pip, conda, or spack
+---
+
+# Installation
+
+This guide covers how to install TorchGeo and its dependencies.
+
+## System Requirements
+
+<Note>
+**Python Version:** TorchGeo requires Python 3.12 or later (supports 3.12, 3.13, and 3.14).
+</Note>
+
+TorchGeo is built on top of PyTorch and several geospatial libraries. The core dependencies include:
+- PyTorch 2.2+
+- torchvision 0.17+
+- rasterio 1.4.3+
+- geopandas 1.0+
+- And more (see below)
+
+## Basic Installation
+
+<Steps>
+  <Step title="Choose your package manager">
+    TorchGeo can be installed using pip, conda, or spack.
+  </Step>
+  <Step title="Install TorchGeo">
+    <CodeGroup>
+    ```bash pip
+    pip install torchgeo
+    ```
+
+    ```bash conda
+    conda install -c conda-forge torchgeo
+    ```
+
+    ```bash spack
+    spack install py-torchgeo
+    ```
+    </CodeGroup>
+  </Step>
+  <Step title="Verify installation">
+    ```python
+    import torchgeo
+    print(torchgeo.__version__)
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+The **recommended** installation method is pip, as it typically has the most up-to-date version.
+</Tip>
+
+## Optional Dependencies
+
+TorchGeo has several optional dependency groups for different use cases.
+
+### Datasets Extra
+
+Install additional dependencies for working with specific dataset formats:
+
+```bash
+pip install torchgeo[datasets]
+```
+
+This includes:
+- **h5py** (3.10+) - HDF5 file format support
+- **laspy** (2.5.3+) - LiDAR point cloud data
+- **netcdf4** (1.6.5+) - NetCDF climate/weather data
+- **pandas[parquet]** (2.1.1+) - Parquet file support
+- **pycocotools** (2.0.8+) - COCO format annotations
+- **requests** (2.25+) - Dataset downloading
+- **rioxarray** (0.14.1+) - Xarray integration
+- **scikit-image** (0.22+) - Image processing
+- **scipy** (1.11.2+) - Scientific computing
+- **webdataset** (0.2.4+) - WebDataset format
+- **xarray** (0.17+) - Multi-dimensional arrays
+
+### Models Extra
+
+For additional pre-trained models:
+
+```bash
+pip install torchgeo[models]
+```
+
+Includes:
+- **microsoft-aurora** (1.6+) - Aurora foundation models
+
+### Documentation Extra
+
+For building documentation locally:
+
+```bash
+pip install torchgeo[docs]
+```
+
+Includes:
+- **ipywidgets** (7+) - Jupyter widgets
+- **myst-parser** (0.18.0+) - Markdown support in Sphinx
+- **nbsphinx** (0.8.5+) - Jupyter notebook integration
+- **pydata-sphinx-theme** (0.14.0+) - Documentation theme
+- **sphinx** (5.3+) - Documentation generator
+
+<Note>
+Building docs also requires Pandoc to be installed separately on your system.
+</Note>
+
+### Style Extra
+
+For code formatting and type checking (contributors only):
+
+```bash
+pip install torchgeo[style]
+```
+
+Includes:
+- **ruff** (0.9+) - Fast Python linter and formatter
+- **ty** (0.0.2+) - Type checker
+- **pandas-stubs**, **types-geopandas**, **types-requests**, **types-shapely** - Type stubs
+
+### Tests Extra
+
+For running the test suite (contributors only):
+
+```bash
+pip install torchgeo[tests]
+```
+
+Includes:
+- **pytest** (7.3.2+) - Testing framework
+- **pytest-cov** (4+) - Coverage reporting
+- **pytest-socket** (0.3.4+) - Network access control
+- **nbmake** (1.4.5+) - Notebook testing
+- **packaging** (21+) - Version handling
+
+### All Dependencies
+
+To install everything:
+
+```bash
+pip install torchgeo[all]
+```
+
+This is equivalent to:
+```bash
+pip install torchgeo[datasets,docs,models,style,tests]
+```
+
+## Development Installation
+
+If you want to contribute to TorchGeo or use the latest development version:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/torchgeo/torchgeo.git
+    cd torchgeo
+    ```
+  </Step>
+  <Step title="Install in editable mode">
+    ```bash
+    pip install -e ".[all]"
+    ```
+  </Step>
+  <Step title="Verify installation">
+    ```bash
+    pytest --cov=torchgeo tests/
+    ```
+  </Step>
+</Steps>
+
+## GPU Support
+
+<Warning>
+TorchGeo itself doesn't require a GPU, but deep learning training benefits significantly from GPU acceleration.
+</Warning>
+
+To use TorchGeo with GPU support, ensure you have PyTorch installed with CUDA:
+
+<CodeGroup>
+```bash CUDA 11.8
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+pip install torchgeo
+```
+
+```bash CUDA 12.1
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install torchgeo
+```
+
+```bash ROCm 6.0
+pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.0
+pip install torchgeo
+```
+</CodeGroup>
+
+See the [PyTorch installation guide](https://pytorch.org/get-started/locally/) for more options.
+
+## Troubleshooting
+
+### GDAL/Rasterio Issues
+
+If you encounter issues with rasterio or GDAL:
+
+```bash
+# On Ubuntu/Debian
+sudo apt-get install gdal-bin libgdal-dev
+
+# On macOS with Homebrew
+brew install gdal
+
+# Then install rasterio
+pip install rasterio
+```
+
+### Import Errors
+
+If you see import errors for optional dependencies:
+
+```python
+ImportError: scipy required for this dataset
+```
+
+Install the datasets extra:
+```bash
+pip install torchgeo[datasets]
+```
+
+### Version Conflicts
+
+If you experience dependency conflicts, try creating a fresh virtual environment:
+
+```bash
+python -m venv torchgeo-env
+source torchgeo-env/bin/activate  # On Windows: torchgeo-env\Scripts\activate
+pip install torchgeo[all]
+```
+
+## Next Steps
+
+Now that TorchGeo is installed, check out the [Quickstart Guide](/quickstart) to start using it!

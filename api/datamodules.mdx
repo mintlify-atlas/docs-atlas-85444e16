@@ -1,0 +1,214 @@
+---
+title: 'DataModules'
+description: 'PyTorch Lightning DataModules for geospatial datasets'
+---
+
+TorchGeo provides DataModules that integrate datasets, samplers, and data loaders for seamless training with PyTorch Lightning.
+
+## Base Classes
+
+### BaseDataModule
+
+Base class for all TorchGeo data modules.
+
+<ParamField path="dataset_class" type="type[Dataset]" required>
+  Class used to instantiate a new dataset
+</ParamField>
+
+<ParamField path="batch_size" type="int" default="1">
+  Size of each mini-batch
+</ParamField>
+
+<ParamField path="num_workers" type="int" default="0">
+  Number of workers for parallel data loading
+</ParamField>
+
+<ParamField path="**kwargs" type="Any">
+  Additional keyword arguments passed to dataset_class
+</ParamField>
+
+### GeoDataModule
+
+Base class for data modules containing geospatial information.
+
+<ParamField path="dataset_class" type="type[GeoDataset]" required>
+  Class used to instantiate a new dataset
+</ParamField>
+
+<ParamField path="batch_size" type="int" default="1">
+  Size of each mini-batch
+</ParamField>
+
+<ParamField path="patch_size" type="int | tuple[int, int]" default="64">
+  Size of each patch, either size or (height, width)
+</ParamField>
+
+<ParamField path="length" type="int | None" default="None">
+  Length of each training epoch
+</ParamField>
+
+<ParamField path="num_workers" type="int" default="0">
+  Number of workers for parallel data loading
+</ParamField>
+
+<ParamField path="**kwargs" type="Any">
+  Additional keyword arguments passed to dataset_class
+</ParamField>
+
+### NonGeoDataModule
+
+Base class for data modules lacking geospatial information.
+
+<ParamField path="dataset_class" type="type[NonGeoDataset]" required>
+  Class used to instantiate a new dataset
+</ParamField>
+
+<ParamField path="batch_size" type="int" default="1">
+  Size of each mini-batch
+</ParamField>
+
+<ParamField path="num_workers" type="int" default="0">
+  Number of workers for parallel data loading
+</ParamField>
+
+<ParamField path="**kwargs" type="Any">
+  Additional keyword arguments passed to dataset_class
+</ParamField>
+
+## Available DataModules
+
+TorchGeo includes pre-configured DataModules for many datasets:
+
+### Scene Classification
+- `BigEarthNetDataModule` - Multi-label scene classification with Sentinel imagery
+- `EuroSATDataModule` - Land use/land cover classification
+- `EuroSAT100DataModule` - 100-sample subset for benchmarking
+- `EuroSATSpatialDataModule` - Spatial variant of EuroSAT
+- `RESISC45DataModule` - Remote sensing image scene classification
+- `UCMercedDataModule` - 21-class land use dataset
+- `PatternNetDataModule` - 38-class pattern recognition
+- `So2SatDataModule` - Sentinel-1 and Sentinel-2 classification
+
+### Semantic Segmentation
+- `ChesapeakeCVPRDataModule` - Land cover segmentation
+- `DeepGlobeLandCoverDataModule` - Multi-class land cover
+- `GID15DataModule` - 15-class land cover
+- `InriaAerialImageLabelingDataModule` - Building segmentation
+- `LandCoverAIDataModule` - Land cover classification
+- `LandCoverAI100DataModule` - 100-sample subset
+- `LoveDADataModule` - Urban land cover
+- `Potsdam2DDataModule` - Urban scene understanding
+- `Vaihingen2DDataModule` - Urban scene understanding
+- `NAIPChesapeakeDataModule` - High-resolution aerial imagery
+
+### Change Detection
+- `LEVIRCDDataModule` - Building change detection
+- `LEVIRCDPlusDataModule` - Extended building change detection
+- `OSCDDataModule` - Onera Satellite Change Detection
+- `OSCD100DataModule` - 100-sample subset
+- `XView2DataModule` - Building damage assessment
+
+### Object Detection
+- `FAIR1MDataModule` - Fine-grained object recognition
+- `VHR10DataModule` - Very high resolution object detection
+- `NASAMarineDebrisDataModule` - Marine debris detection
+- `COWCCountingDataModule` - Car counting
+
+### Regression
+- `SustainBenchCropYieldDataModule` - Crop yield prediction
+- `TropicalCycloneDataModule` - Cyclone wind speed estimation
+- `FireRiskDataModule` - Fire risk prediction
+
+### Self-Supervised Learning
+- `SSL4EOLDataModule` - SSL for Earth Observation (Landsat)
+- `SSL4EOS12DataModule` - SSL for Earth Observation (Sentinel-2)
+- `SSL4EOLBenchmarkDataModule` - Benchmark for SSL4EO-L
+- `SeasonalContrastS2DataModule` - Seasonal Contrast with Sentinel-2
+
+### Time Series
+- `PASTISDataModule` - Panoptic Agricultural Satellite Time Series
+- `PASTIS100DataModule` - 100-sample subset
+- `TreeSatAIDataModule` - Tree species classification from time series
+
+### Crop Type Mapping
+- `AgriFieldNetDataModule` - Agricultural field boundary detection
+- `FieldsOfTheWorldDataModule` - Global crop field mapping
+- `SouthAfricaCropTypeDataModule` - Crop type classification
+- `Sentinel2CDLDataModule` - Sentinel-2 with Crop Data Layer
+- `Sentinel2EuroCropsDataModule` - Sentinel-2 with EuroCrops
+- `Sentinel2NCCMDataModule` - Sentinel-2 with NCCM labels
+- `Sentinel2SouthAmericaSoybeanDataModule` - Soybean mapping
+
+### Other Tasks
+- `CloudCoverDetectionDataModule` - Cloud cover estimation
+- `DigitalTyphoonDataModule` - Typhoon intensity estimation
+- `ETCI2021DataModule` - Tropical cyclone intensity estimation
+- `GeoNRWDataModule` - Land cover North Rhine-Westphalia
+- `HySpecNet11kDataModule` - Hyperspectral benchmark
+- `IOBenchDataModule` - I/O benchmark dataset
+- `L7IrishDataModule` - Landsat 7 Irish scenes
+- `L8BiomeDataModule` - Landsat 8 biome dataset
+- `MMFloodDataModule` - Multi-modal flood detection
+- `QuakeSetDataModule` - Earthquake damage assessment
+- `ReforesTreeDataModule` - Tree reforestation monitoring
+- `SEN12MSDataModule` - Multi-modal semantic segmentation
+- `SKIPPDDataModule` - Satellite Key Point Detection
+- `SolarPlantsBrazilDataModule` - Solar plant detection
+- `SpaceNet1DataModule` - Building footprint extraction
+- `SpaceNet6DataModule` - Multi-sensor all-weather mapping
+- `SubstationDataModule` - Electrical substation detection
+- `USAVarsDataModule` - Vegetation condition monitoring
+
+## Usage Example
+
+```python
+from lightning.pytorch import Trainer
+from torchgeo.datamodules import EuroSATDataModule
+from torchgeo.trainers import ClassificationTask
+
+# Initialize datamodule
+datamodule = EuroSATDataModule(
+    root='data',
+    batch_size=32,
+    num_workers=4,
+    download=True
+)
+
+# Initialize task
+task = ClassificationTask(
+    model='resnet50',
+    in_channels=13,
+    num_classes=10,
+    lr=1e-3
+)
+
+# Train
+trainer = Trainer(max_epochs=10)
+trainer.fit(model=task, datamodule=datamodule)
+```
+
+## Custom DataModules
+
+You can create custom DataModules by subclassing `GeoDataModule` or `NonGeoDataModule`:
+
+```python
+from torchgeo.datamodules import NonGeoDataModule
+from torchgeo.datasets import RESISC45
+
+class CustomDataModule(NonGeoDataModule):
+    def __init__(self, root='data', batch_size=32, **kwargs):
+        super().__init__(
+            dataset_class=RESISC45,
+            batch_size=batch_size,
+            root=root,
+            **kwargs
+        )
+```
+
+## Key Features
+
+- **Automatic splitting**: DataModules handle train/val/test splits
+- **Integrated samplers**: GeoDataModules use geospatial samplers for efficient tiling
+- **Data augmentation**: Built-in support for Kornia augmentations via `on_after_batch_transfer`
+- **Multi-worker loading**: Configurable parallel data loading
+- **Lightning integration**: Direct compatibility with PyTorch Lightning Trainer

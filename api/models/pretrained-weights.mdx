@@ -1,0 +1,305 @@
+---
+title: Pre-trained Weights
+description: Available pre-trained weights for TorchGeo models
+---
+
+TorchGeo provides a comprehensive collection of pre-trained weights for models trained on various remote sensing datasets. All weights follow the PyTorch/torchvision WeightsEnum API.
+
+## Weight Classes
+
+Weight classes are organized by model architecture. Each weight variant contains metadata about the training dataset, input channels, and pre-training method.
+
+### ResNet Weights
+
+#### ResNet18_Weights
+
+Weights for ResNet-18 models trained on Landsat and Sentinel-2 imagery.
+
+**Landsat Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method | Sensor |
+|------------|---------|----------|------------|--------|
+| `LANDSAT_TM_TOA_MOCO` | SSL4EO-L | 7 | MoCo | Landsat 5 TM |
+| `LANDSAT_TM_TOA_SIMCLR` | SSL4EO-L | 7 | SimCLR | Landsat 5 TM |
+| `LANDSAT_ETM_TOA_MOCO` | SSL4EO-L | 9 | MoCo | Landsat 7 ETM+ |
+| `LANDSAT_ETM_TOA_SIMCLR` | SSL4EO-L | 9 | SimCLR | Landsat 7 ETM+ |
+| `LANDSAT_ETM_SR_MOCO` | SSL4EO-L | 6 | MoCo | Landsat 7 ETM+ SR |
+| `LANDSAT_ETM_SR_SIMCLR` | SSL4EO-L | 6 | SimCLR | Landsat 7 ETM+ SR |
+| `LANDSAT_OLI_TIRS_TOA_MOCO` | SSL4EO-L | 11 | MoCo | Landsat 8 OLI/TIRS |
+| `LANDSAT_OLI_TIRS_TOA_SIMCLR` | SSL4EO-L | 11 | SimCLR | Landsat 8 OLI/TIRS |
+| `LANDSAT_OLI_SR_MOCO` | SSL4EO-L | 7 | MoCo | Landsat 8 OLI SR |
+| `LANDSAT_OLI_SR_SIMCLR` | SSL4EO-L | 7 | SimCLR | Landsat 8 OLI SR |
+
+**Sentinel-2 Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method | Bands |
+|------------|---------|----------|------------|-------|
+| `SENTINEL2_ALL_MOCO` | SSL4EO-S12 | 13 | MoCo | All bands |
+| `SENTINEL2_RGB_MOCO` | SSL4EO-S12 | 3 | MoCo | RGB only |
+| `SENTINEL2_RGB_SECO` | SeCo Dataset | 3 | SeCo | RGB only |
+
+#### ResNet50_Weights
+
+Weights for ResNet-50 models with extensive coverage of sensors and pre-training methods.
+
+**Sentinel-1 SAR Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL1_GRD_MOCO` | SSL4EO-S12 | 2 | MoCo |
+| `SENTINEL1_GRD_DECUR` | SSL4EO-S12 | 2 | DeCUR |
+| `SENTINEL1_GRD_CLOSP` | CrisisLandMark | 2 | CLOSP |
+| `SENTINEL1_GRD_GEOCLOSP` | CrisisLandMark | 2 | GeoCLOSP |
+| `SENTINEL1_GRD_SOFTCON` | SSL4EO-S12 | 2 | SoftCon |
+
+**Sentinel-2 Optical Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL2_ALL_MOCO` | SSL4EO-S12 | 13 | MoCo |
+| `SENTINEL2_ALL_DINO` | SSL4EO-S12 | 13 | DINO |
+| `SENTINEL2_ALL_DECUR` | SSL4EO-S12 | 13 | DeCUR |
+| `SENTINEL2_ALL_CLOSP` | CrisisLandMark | 13 | CLOSP |
+| `SENTINEL2_ALL_GEOCLOSP` | CrisisLandMark | 13 | GeoCLOSP |
+| `SENTINEL2_ALL_SOFTCON` | SSL4EO-S12 | 13 | SoftCon |
+| `SENTINEL2_ALL_SECO_ECO` | SSL4Eco Dataset | 12 | SeCo-Eco |
+| `SENTINEL2_RGB_MOCO` | SSL4EO-S12 | 3 | MoCo |
+| `SENTINEL2_RGB_SECO` | SeCo Dataset | 3 | SeCo |
+
+**Satlas Weights:**
+
+| Weight Name | Dataset | Channels | Type |
+|------------|---------|----------|------|
+| `SENTINEL2_MI_MS_SATLAS` | SatlasPretrain | 9 | Multi-image MS |
+| `SENTINEL2_MI_RGB_SATLAS` | SatlasPretrain | 3 | Multi-image RGB |
+| `SENTINEL2_SI_MS_SATLAS` | SatlasPretrain | 9 | Single-image MS |
+| `SENTINEL2_SI_RGB_SATLAS` | SatlasPretrain | 3 | Single-image RGB |
+
+**Other Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `FMOW_RGB_GASSL` | fMoW Dataset | 3 | GASSL |
+| `LANDSAT_*` | SSL4EO-L | 6-11 | MoCo/SimCLR |
+
+#### ResNet152_Weights
+
+| Weight Name | Dataset | Channels | Type |
+|------------|---------|----------|------|
+| `SENTINEL2_MI_MS_SATLAS` | SatlasPretrain | 9 | Multi-image MS |
+| `SENTINEL2_MI_RGB_SATLAS` | SatlasPretrain | 3 | Multi-image RGB |
+| `SENTINEL2_SI_MS_SATLAS` | SatlasPretrain | 9 | Single-image MS |
+| `SENTINEL2_SI_RGB_SATLAS` | SatlasPretrain | 3 | Single-image RGB |
+
+### Vision Transformer Weights
+
+#### ViTSmall16_Weights
+
+**Landsat Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method | Sensor |
+|------------|---------|----------|------------|--------|
+| `LANDSAT_TM_TOA_MOCO` | SSL4EO-L | 7 | MoCo | Landsat 5 TM |
+| `LANDSAT_TM_TOA_SIMCLR` | SSL4EO-L | 7 | SimCLR | Landsat 5 TM |
+| `LANDSAT_ETM_TOA_MOCO` | SSL4EO-L | 9 | MoCo | Landsat 7 ETM+ |
+| `LANDSAT_ETM_TOA_SIMCLR` | SSL4EO-L | 9 | SimCLR | Landsat 7 ETM+ |
+| `LANDSAT_ETM_SR_MOCO` | SSL4EO-L | 6 | MoCo | Landsat 7 ETM+ SR |
+| `LANDSAT_ETM_SR_SIMCLR` | SSL4EO-L | 6 | SimCLR | Landsat 7 ETM+ SR |
+| `LANDSAT_OLI_TIRS_TOA_MOCO` | SSL4EO-L | 11 | MoCo | Landsat 8 OLI/TIRS |
+| `LANDSAT_OLI_TIRS_TOA_SIMCLR` | SSL4EO-L | 11 | SimCLR | Landsat 8 OLI/TIRS |
+| `LANDSAT_OLI_SR_MOCO` | SSL4EO-L | 7 | MoCo | Landsat 8 OLI SR |
+| `LANDSAT_OLI_SR_SIMCLR` | SSL4EO-L | 7 | SimCLR | Landsat 8 OLI SR |
+
+**Sentinel-2 Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL2_ALL_MOCO` | SSL4EO-S12 | 13 | MoCo |
+| `SENTINEL2_ALL_DINO` | SSL4EO-S12 | 13 | DINO |
+| `SENTINEL2_ALL_MAE` | SSL4EO-S12 | 13 | MAE |
+| `SENTINEL2_ALL_FGMAE` | SSL4EO-S12 | 13 | FG-MAE |
+| `SENTINEL2_ALL_CLOSP` | CrisisLandMark | 13 | CLOSP |
+
+**Sentinel-1 Weights:**
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL1_GRD_MAE` | SSL4EO-S12 | 2 | MAE |
+| `SENTINEL1_GRD_FGMAE` | SSL4EO-S12 | 2 | FG-MAE |
+| `SENTINEL1_GRD_CLOSP` | CrisisLandMark | 2 | CLOSP |
+
+#### ViTBase16_Weights
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL2_ALL_MAE` | SSL4EO-S12 | 13 | MAE |
+| `SENTINEL2_ALL_FGMAE` | SSL4EO-S12 | 13 | FG-MAE |
+| `SENTINEL1_GRD_MAE` | SSL4EO-S12 | 2 | MAE |
+| `SENTINEL1_GRD_FGMAE` | SSL4EO-S12 | 2 | FG-MAE |
+
+#### ViTLarge16_Weights
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL2_ALL_MAE` | SSL4EO-S12 | 13 | MAE |
+| `SENTINEL2_ALL_FGMAE` | SSL4EO-S12 | 13 | FG-MAE |
+| `SENTINEL2_ALL_CLOSP` | CrisisLandMark | 13 | CLOSP |
+| `SENTINEL1_GRD_MAE` | SSL4EO-S12 | 2 | MAE |
+| `SENTINEL1_GRD_FGMAE` | SSL4EO-S12 | 2 | FG-MAE |
+| `SENTINEL1_GRD_CLOSP` | CrisisLandMark | 2 | CLOSP |
+
+#### ViTHuge14_Weights
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL2_ALL_MAE` | SSL4EO-S12 | 13 | MAE |
+| `SENTINEL2_ALL_FGMAE` | SSL4EO-S12 | 13 | FG-MAE |
+| `SENTINEL1_GRD_MAE` | SSL4EO-S12 | 2 | MAE |
+| `SENTINEL1_GRD_FGMAE` | SSL4EO-S12 | 2 | FG-MAE |
+
+#### ViTSmall14_DINOv2_Weights
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL2_ALL_SOFTCON` | SSL4EO-S12 | 13 | SoftCon |
+| `SENTINEL1_GRD_SOFTCON` | SSL4EO-S12 | 2 | SoftCon |
+
+#### ViTBase14_DINOv2_Weights
+
+| Weight Name | Dataset | Channels | SSL Method |
+|------------|---------|----------|------------|
+| `SENTINEL2_ALL_SOFTCON` | SSL4EO-S12 | 13 | SoftCon |
+| `SENTINEL1_GRD_SOFTCON` | SSL4EO-S12 | 2 | SoftCon |
+
+### Swin Transformer Weights
+
+#### Swin_V2_T_Weights, Swin_V2_B_Weights
+
+| Weight Name | Dataset | Channels | Type |
+|------------|---------|----------|------|
+| `SENTINEL2_MI_MS_SATLAS` | SatlasPretrain | 9 | Multi-image MS |
+| `SENTINEL2_MI_RGB_SATLAS` | SatlasPretrain | 3 | Multi-image RGB |
+| `SENTINEL2_SI_MS_SATLAS` | SatlasPretrain | 9 | Single-image MS |
+| `SENTINEL2_SI_RGB_SATLAS` | SatlasPretrain | 3 | Single-image RGB |
+
+### Foundation Model Weights
+
+#### DOFABase16_Weights
+
+| Weight Name | Dataset | SSL Method | Notes |
+|------------|---------|------------|-------|
+| `DOFA_MAE` | SatlasPretrain, Five-Billion-Pixels, HySpecNet-11k | MAE | Dynamic channel support |
+
+#### DOFALarge16_Weights
+
+| Weight Name | Dataset | SSL Method | Notes |
+|------------|---------|------------|-------|
+| `DOFA_MAE` | SatlasPretrain, Five-Billion-Pixels, HySpecNet-11k | MAE | Dynamic channel support |
+
+#### Presto_Weights
+
+| Weight Name | Dataset | Notes |
+|------------|---------|-------|
+| `PRESTO` | LEM (Presto pretraining dataset) | Temporal transformer for S1/S2 time series |
+
+#### CopernicusFM_Base_Weights
+
+| Weight Name | Dataset | Channels |
+|------------|---------|----------|
+| Not yet documented | Copernicus data | Variable |
+
+#### ScaleMAELarge16_Weights
+
+| Weight Name | Dataset | Notes |
+|------------|---------|-------|
+| Not yet documented | Multi-scale imagery | Scale-aware MAE |
+
+### Segmentation Model Weights
+
+#### Unet_Weights
+
+Weights for U-Net models trained on field boundary detection:
+
+| Weight Name | Dataset | Channels | Classes | Encoder | License |
+|------------|---------|----------|---------|---------|----------|
+| `SENTINEL2_2CLASS_FTW` | FTW | 8 | 2 | EfficientNet-B3 | CC-BY-4.0 |
+| `SENTINEL2_3CLASS_FTW` | FTW | 8 | 3 | EfficientNet-B3 | CC-BY-4.0 |
+| `SENTINEL2_2CLASS_NC_FTW` | FTW | 8 | 2 | EfficientNet-B3 | Non-commercial |
+| `SENTINEL2_3CLASS_NC_FTW` | FTW | 8 | 3 | EfficientNet-B3 | Non-commercial |
+| `SENTINEL2_FTW_PRUE_EFNETB3` | FTW | 8 | 3 | EfficientNet-B3 | Non-commercial |
+| `SENTINEL2_FTW_PRUE_EFNETB5` | FTW | 8 | 3 | EfficientNet-B5 | Non-commercial |
+| `SENTINEL2_FTW_PRUE_EFNETB7` | FTW | 8 | 3 | EfficientNet-B7 | Non-commercial |
+
+## Using Weights
+
+### Loading Weights
+
+```python
+from torchgeo.models import resnet50, ResNet50_Weights
+
+# Method 1: Direct weight enum
+weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
+model = resnet50(weights=weights)
+
+# Method 2: Using get_weight
+from torchgeo.models import get_weight
+weight = get_weight('ResNet50_Weights.SENTINEL2_ALL_MOCO')
+model = resnet50(weights=weight)
+```
+
+### Accessing Weight Metadata
+
+```python
+weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
+
+print(f"Dataset: {weights.meta['dataset']}")
+print(f"Channels: {weights.meta['in_chans']}")
+print(f"SSL Method: {weights.meta['ssl_method']}")
+print(f"Bands: {weights.meta['bands']}")
+
+# Output:
+# Dataset: SSL4EO-S12
+# Channels: 13
+# SSL Method: moco
+# Bands: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8a', 'B9', 'B10', 'B11', 'B12']
+```
+
+### Listing Available Weights
+
+```python
+from torchgeo.models import get_model_weights
+
+# Get all weights for a model
+weights = get_model_weights('resnet50')
+for w in weights:
+    print(f"{w.name}: {w.meta.get('in_chans')} channels")
+```
+
+### Transforms
+
+Each weight includes a `transforms` attribute with the preprocessing pipeline used during training:
+
+```python
+weights = ResNet50_Weights.SENTINEL2_ALL_MOCO
+transforms = weights.transforms
+
+# Apply transforms to input
+output = transforms(input_tensor)
+```
+
+## Weight Naming Convention
+
+Weight names follow the pattern:
+```
+<SENSOR>_<BANDS>_<METHOD>
+```
+
+Where:
+- `SENSOR`: SENTINEL1, SENTINEL2, LANDSAT
+- `BANDS`: ALL, RGB, MS (multispectral), GRD (ground range detected)
+- `METHOD`: MOCO, SIMCLR, DINO, MAE, SECO, etc.
+
+Examples:
+- `SENTINEL2_ALL_MOCO`: Sentinel-2 all bands, MoCo pre-training
+- `LANDSAT_OLI_SR_SIMCLR`: Landsat 8 OLI surface reflectance, SimCLR pre-training
+- `SENTINEL1_GRD_MAE`: Sentinel-1 GRD, MAE pre-training

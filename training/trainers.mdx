@@ -1,0 +1,382 @@
+---
+title: Trainers
+description: Task-specific trainers for classification, segmentation, detection, and more
+---
+
+TorchGeo provides task-specific trainers (called "Tasks" in Lightning terminology) for common remote sensing problems. Each task handles model creation, loss computation, and metric logging.
+
+## Available tasks
+
+### Classification
+
+#### ClassificationTask
+
+Single-label image classification:
+
+```python
+from torchgeo.trainers import ClassificationTask
+
+task = ClassificationTask(
+    model="resnet50",
+    in_channels=13,      # Number of input bands
+    num_classes=10,      # Number of classes
+    loss="ce",           # Cross-entropy loss
+    weights=None,        # Pre-trained weights (optional)
+    lr=1e-3,             # Learning rate
+    patience=10          # Learning rate scheduler patience
+)
+```
+
+**Supported models**: Any timm model (resnet, efficientnet, vit, etc.)
+
+**Loss functions**: `"ce"` (cross-entropy), `"focal"`, `"jaccard"`, `"bce"` (binary)
+
+#### MultiLabelClassificationTask
+
+Multi-label classification (multiple labels per image):
+
+```python
+from torchgeo.trainers import MultiLabelClassificationTask
+
+task = MultiLabelClassificationTask(
+    model="resnet18",
+    in_channels=3,
+    num_classes=19,  # Multi-label
+    loss="bce",      # Binary cross-entropy
+    lr=1e-3
+)
+```
+
+### Semantic Segmentation
+
+#### SemanticSegmentationTask
+
+Pixel-wise classification:
+
+```python
+from torchgeo.trainers import SemanticSegmentationTask
+
+task = SemanticSegmentationTask(
+    model="unet",
+    backbone="resnet50",
+    weights=True,         # ImageNet weights for backbone
+    in_channels=3,
+    num_classes=2,        # Binary or multi-class
+    loss="ce",            # "ce", "focal", "jaccard", "dice"
+    class_weights=None,   # Class weights for imbalanced data
+    ignore_index=None,    # Ignore label (e.g., for no-data)
+    lr=1e-3
+)
+```
+
+**Supported models**:
+- `"unet"`: U-Net with various backbones
+- `"deeplabv3+"`: DeepLabV3+
+- `"fcn"`: Fully Convolutional Network
+- `"farseg"`: FarSeg for high-resolution imagery
+
+**Supported backbones**: Any timm model (resnet, efficientnet, etc.)
+
+### Object Detection
+
+#### ObjectDetectionTask
+
+Bounding box detection:
+
+```python
+from torchgeo.trainers import ObjectDetectionTask
+
+task = ObjectDetectionTask(
+    model="faster-rcnn",
+    backbone="resnet50",
+    num_classes=11,  # Including background class
+    lr=1e-4
+)
+```
+
+**Supported models**:
+- `"faster-rcnn"`: Faster R-CNN
+- `"fcos"`: FCOS (anchor-free)
+- `"retinanet"`: RetinaNet
+
+### Instance Segmentation
+
+#### InstanceSegmentationTask
+
+Instance-level segmentation:
+
+```python
+from torchgeo.trainers import InstanceSegmentationTask
+
+task = InstanceSegmentationTask(
+    model="mask-rcnn",
+    backbone="resnet50",
+    num_classes=11,
+    lr=1e-4
+)
+```
+
+### Change Detection
+
+#### ChangeDetectionTask  
+
+Detect changes between bi-temporal images:
+
+```python
+from torchgeo.trainers import ChangeDetectionTask
+
+task = ChangeDetectionTask(
+    model="fcsiamdiff",  # "fcsiamdiff", "fcsiamconc"
+    in_channels=3,
+    loss="ce",
+    lr=1e-3
+)
+```
+
+**Input format**: Expects `"image"` key with shape `(B, T, C, H, W)` where T=2 for bi-temporal.
+
+### Regression
+
+#### RegressionTask
+
+Image-level regression:
+
+```python
+from torchgeo.trainers import RegressionTask
+
+task = RegressionTask(
+    model="resnet18",
+    in_channels=15,
+    loss="mse",  # "mse" or "mae"
+    lr=1e-3
+)
+```
+
+#### PixelwiseRegressionTask
+
+Pixel-wise regression (e.g., elevation, temperature):
+
+```python
+from torchgeo.trainers import PixelwiseRegressionTask
+
+task = PixelwiseRegressionTask(
+    model="unet",
+    backbone="resnet50",
+    in_channels=4,
+    loss="mse",
+    lr=1e-3
+)
+```
+
+## Self-supervised learning
+
+Pre-train models on unlabeled data:
+
+### BYOLTask
+
+Bootstrap Your Own Latent:
+
+```python
+from torchgeo.trainers import BYOLTask
+
+task = BYOLTask(
+    model="resnet50",
+    in_channels=13,
+    lr=1e-3,
+    weight_decay=1e-4
+)
+```
+
+### MoCoTask
+
+Momentum Contrast:
+
+```python
+from torchgeo.trainers import MoCoTask
+
+task = MoCoTask(
+    model="resnet18",
+    in_channels=10,
+    lr=1e-3,
+    memory_bank_size=4096,
+    temperature=0.07
+)
+```
+
+### SimCLRTask
+
+Simple Framework for Contrastive Learning:
+
+```python
+from torchgeo.trainers import SimCLRTask
+
+task = SimCLRTask(
+    model="resnet50",
+    in_channels=12,
+    lr=1e-3,
+    temperature=0.1
+)
+```
+
+## Common parameters
+
+All tasks support these parameters:
+
+- `model`: Model architecture name
+- `loss`: Loss function name
+- `lr`: Learning rate
+- `patience`: Patience for ReduceLROnPlateau scheduler
+- `freeze_backbone`: Freeze backbone during training (bool)
+- `freeze_decoder`: Freeze decoder during training (bool)
+
+```python
+task = ClassificationTask(
+    model="resnet50",
+    in_channels=13,
+    num_classes=10,
+    loss="ce",
+    lr=1e-3,
+    patience=10,
+    freeze_backbone=False
+)
+```
+
+## Using with DataModules
+
+Tasks work seamlessly with DataModules:
+
+```python
+from lightning.pytorch import Trainer
+from torchgeo.datamodules import EuroSATDataModule
+from torchgeo.trainers import ClassificationTask
+
+# Data
+datamodule = EuroSATDataModule(root="data", batch_size=32)
+
+# Model  
+task = ClassificationTask(
+    model="resnet18",
+    in_channels=13,
+    num_classes=10,
+    loss="ce"
+)
+
+# Train
+trainer = Trainer(max_epochs=10)
+trainer.fit(task, datamodule)
+```
+
+## Complete examples
+
+<Tabs>
+  <Tab title="Classification">
+    ```python
+    from lightning.pytorch import Trainer
+    from torchgeo.datamodules import EuroSATDataModule
+    from torchgeo.trainers import ClassificationTask
+    
+    datamodule = EuroSATDataModule(
+        root="./data",
+        batch_size=32,
+        num_workers=4
+    )
+    
+    task = ClassificationTask(
+        model="resnet50",
+        in_channels=13,
+        num_classes=10,
+        loss="ce",
+        lr=1e-3
+    )
+    
+    trainer = Trainer(max_epochs=50)
+    trainer.fit(task, datamodule)
+    ```
+  </Tab>
+  
+  <Tab title="Segmentation">
+    ```python
+    from lightning.pytorch import Trainer
+    from torchgeo.datamodules import InriaAerialImageLabelingDataModule
+    from torchgeo.trainers import SemanticSegmentationTask
+    
+    datamodule = InriaAerialImageLabelingDataModule(
+        root="./data",
+        batch_size=8,
+        num_workers=6
+    )
+    
+    task = SemanticSegmentationTask(
+        model="unet",
+        backbone="resnet50",
+        weights=True,
+        in_channels=3,
+        num_classes=2,
+        loss="bce",
+        lr=1e-3
+    )
+    
+    trainer = Trainer(max_epochs=50)
+    trainer.fit(task, datamodule)
+    ```
+  </Tab>
+  
+  <Tab title="Detection">
+    ```python
+    from lightning.pytorch import Trainer
+    from torchgeo.datamodules import VHR10DataModule
+    from torchgeo.trainers import ObjectDetectionTask
+    
+    datamodule = VHR10DataModule(
+        root="./data",
+        batch_size=4,
+        num_workers=2
+    )
+    
+    task = ObjectDetectionTask(
+        model="faster-rcnn",
+        backbone="resnet50",
+        num_classes=11,  # 10 classes + background
+        lr=1e-4
+    )
+    
+    trainer = Trainer(max_epochs=30)
+    trainer.fit(task, datamodule)
+    ```
+  </Tab>
+</Tabs>
+
+## Metrics and logging
+
+Tasks automatically log relevant metrics:
+
+- **Classification**: Accuracy, F1, precision, recall
+- **Segmentation**: IoU, F1, accuracy
+- **Detection**: mAP, precision, recall
+- **Regression**: MSE, MAE, RMSE
+
+Access logged metrics:
+
+```python
+# After training
+metrics = trainer.callback_metrics
+print(f"Val Accuracy: {metrics['val_accuracy']:.4f}")
+print(f"Val Loss: {metrics['val_loss']:.4f}")
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Lightning CLI" icon="terminal" href="/training/lightning-cli">
+    Train models from the command line
+  </Card>
+  <Card title="Pre-trained Weights" icon="download" href="/training/pretrained-weights">
+    Use sensor-specific pre-trained weights
+  </Card>
+  <Card title="Custom Trainers" icon="wrench" href="/training/custom-trainers">
+    Create your own task classes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/trainers">
+    Complete trainer API documentation
+  </Card>
+</CardGroup>

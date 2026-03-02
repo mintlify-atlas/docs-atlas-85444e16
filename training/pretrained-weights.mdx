@@ -1,0 +1,374 @@
+---
+title: Pre-trained weights
+description: Use multispectral pre-trained models for transfer learning
+---
+
+TorchGeo is the first library to support pre-trained weights for multispectral satellite imagery. Use sensor-specific weights (Sentinel-2, Landsat, etc.) for better transfer learning than ImageNet.
+
+## Why multispectral weights?
+
+Remote sensing data differs from natural images:
+
+- **Multiple spectral bands**: 10-13 bands vs. 3 RGB channels
+- **Different statistics**: Reflectance values vs. 0-255 RGB
+- **Domain gap**: Satellite views vs. ground-level photos
+
+<Note>
+Models pre-trained on Sentinel-2 or Landsat data often outperform ImageNet pre-training for remote sensing tasks.
+</Note>
+
+## Available weights
+
+TorchGeo provides weights for multiple architectures and sensors:
+
+### ResNet weights
+
+- **ResNet-18**: Sentinel-1, Sentinel-2, Landsat, Satlas
+- **ResNet-50**: Sentinel-1, Sentinel-2, Satlas
+- **ResNet-152**: Sentinel-2
+
+### Vision Transformer weights
+
+- **ViT-Small-16**: Sentinel-2, SSL4EO
+- **ViT-Base-16**: Sentinel-2
+- **ViT-Large-16**: Sentinel-2
+- **ViT-Huge-14**: Sentinel-2
+
+### Foundation model weights
+
+- **DOFA**: Dynamic One-For-All transformer
+- **Presto**: Pretrained Remote Sensing Transformer
+- **ScaleMAE**: Scale-aware Masked Autoencoder
+- **CopernicusFM**: Copernicus Foundation Model
+
+## Using pre-trained weights
+
+### With timm models
+
+Load weights into timm models:
+
+```python
+import timm
+from torchgeo.models import ResNet18_Weights
+
+# Select weights
+weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
+
+# Create model with correct input channels
+model = timm.create_model(
+    "resnet18",
+    in_chans=weights.meta["in_chans"],  # 13 channels for Sentinel-2
+    num_classes=10
+)
+
+# Load pre-trained weights
+model.load_state_dict(weights.get_state_dict(progress=True), strict=False)
+```
+
+<Info>
+`strict=False` allows loading weights even if the final classification layer has different dimensions.
+</Info>
+
+### With TorchGeo trainers
+
+Pass weights directly to tasks:
+
+```python
+from torchgeo.trainers import ClassificationTask
+from torchgeo.models import ResNet50_Weights
+
+task = ClassificationTask(
+    model="resnet50",
+    weights=ResNet50_Weights.SENTINEL2_ALL_MOCO,  # Use Sentinel-2 weights
+    in_channels=13,
+    num_classes=10,
+    loss="ce"
+)
+```
+
+## Weight metadata
+
+Access information about the weights:
+
+```python
+from torchgeo.models import ResNet18_Weights
+
+weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
+
+# Print metadata
+print(weights.meta)
+# {
+#     'in_chans': 13,
+#     'bands': ['B1', 'B2', ..., 'B12', 'B8A'],
+#     'dataset': 'BigEarthNet',
+#     'ssl_method': 'MoCo v2',
+#     'publication': 'https://arxiv.org/abs/2111.08872'
+# }
+
+# Get input channels
+num_channels = weights.meta["in_chans"]  # 13
+
+# Get band names
+bands = weights.meta["bands"]  # Sentinel-2 band names
+```
+
+## Listing available weights
+
+Find all available weights for a model:
+
+```python
+from torchgeo.models import get_model_weights
+
+# List all ResNet-18 weights
+weights_list = get_model_weights("resnet18")
+
+for weights in weights_list:
+    print(f"{weights.name}: {weights.meta['in_chans']} channels")
+    
+# Output:
+# SENTINEL2_ALL_MOCO: 13 channels
+# SENTINEL1_ALL_MOCO: 2 channels
+# LANDSAT_TM_TOA_MOCO: 7 channels
+# SATLAS_S2_ALL_SIMCLR: 10 channels
+```
+
+## Weight comparison
+
+<Tabs>
+  <Tab title="Sentinel-2">
+    **Bands**: 13 multispectral bands (B1-B12, B8A)
+    
+    **Wavelengths**: Visible, NIR, SWIR (443nm - 2190nm)
+    
+    **Resolution**: 10m - 60m
+    
+    **Best for**: Vegetation, land cover, agriculture
+    
+    ```python
+    from torchgeo.models import ResNet18_Weights
+    
+    weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
+    # 13 channels: all Sentinel-2 bands
+    ```
+  </Tab>
+  
+  <Tab title="Sentinel-1">
+    **Bands**: 2 SAR polarizations (VV, VH)
+    
+    **Wavelengths**: C-band SAR (5.4 GHz)
+    
+    **Resolution**: 10m
+    
+    **Best for**: All-weather imaging, surface roughness
+    
+    ```python
+    from torchgeo.models import ResNet18_Weights
+    
+    weights = ResNet18_Weights.SENTINEL1_ALL_MOCO
+    # 2 channels: VV and VH polarization
+    ```
+  </Tab>
+  
+  <Tab title="Landsat">
+    **Bands**: 7 multispectral bands
+    
+    **Wavelengths**: Visible, NIR, SWIR (430nm - 2290nm)
+    
+    **Resolution**: 30m
+    
+    **Best for**: Long-term monitoring, change detection
+    
+    ```python
+    from torchgeo.models import ResNet18_Weights
+    
+    weights = ResNet18_Weights.LANDSAT_TM_TOA_MOCO
+    # 7 channels: Landsat TM bands
+    ```
+  </Tab>
+</Tabs>
+
+## Fine-tuning strategies
+
+### Full fine-tuning
+
+Train all layers:
+
+```python
+task = ClassificationTask(
+    model="resnet50",
+    weights=ResNet50_Weights.SENTINEL2_ALL_MOCO,
+    in_channels=13,
+    num_classes=10,
+    freeze_backbone=False,  # Train all layers
+    lr=1e-3
+)
+```
+
+### Feature extraction
+
+Freeze backbone, train only the head:
+
+```python
+task = ClassificationTask(
+    model="resnet50",
+    weights=ResNet50_Weights.SENTINEL2_ALL_MOCO,
+    in_channels=13,
+    num_classes=10,
+    freeze_backbone=True,  # Freeze backbone
+    lr=1e-3
+)
+```
+
+### Progressive unfreezing
+
+Start frozen, then unfreeze:
+
+```python
+from lightning.pytorch import Trainer
+from lightning.pytorch.callbacks import Callback
+
+class UnfreezeCallback(Callback):
+    def on_train_epoch_start(self, trainer, pl_module):
+        if trainer.current_epoch == 10:
+            # Unfreeze after 10 epochs
+            pl_module.freeze_backbone = False
+            
+task = ClassificationTask(
+    model="resnet50",
+    weights=ResNet50_Weights.SENTINEL2_ALL_MOCO,
+    freeze_backbone=True,
+    lr=1e-3
+)
+
+trainer = Trainer(callbacks=[UnfreezeCallback()])
+trainer.fit(task, datamodule)
+```
+
+## Complete example
+
+```python
+import timm
+from torch.utils.data import DataLoader
+from torchgeo.datasets import EuroSAT
+from torchgeo.models import ResNet18_Weights
+
+# Load dataset
+train_dataset = EuroSAT(root="data", split="train", download=True)
+val_dataset = EuroSAT(root="data", split="val")
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32)
+
+# Create model with pre-trained weights
+weights = ResNet18_Weights.SENTINEL2_ALL_MOCO
+model = timm.create_model(
+    "resnet18",
+    in_chans=weights.meta["in_chans"],  # 13
+    num_classes=10,
+    pretrained=False
+)
+
+# Load weights (excluding final layer)
+model.load_state_dict(weights.get_state_dict(progress=True), strict=False)
+
+# Training loop
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+criterion = torch.nn.CrossEntropyLoss()
+
+for epoch in range(10):
+    model.train()
+    for batch in train_loader:
+        image = batch["image"]
+        label = batch["label"]
+        
+        output = model(image)
+        loss = criterion(output, label)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+```
+
+## Using with Lightning
+
+The easiest way to use pre-trained weights:
+
+```python
+from lightning.pytorch import Trainer
+from torchgeo.datamodules import EuroSATDataModule
+from torchgeo.trainers import ClassificationTask
+from torchgeo.models import ResNet50_Weights
+
+# Data
+datamodule = EuroSATDataModule(root="data", batch_size=32)
+
+# Model with pre-trained weights
+task = ClassificationTask(
+    model="resnet50",
+    weights=ResNet50_Weights.SENTINEL2_ALL_MOCO,
+    in_channels=13,
+    num_classes=10,
+    loss="ce",
+    lr=1e-3
+)
+
+# Train
+trainer = Trainer(max_epochs=50)
+trainer.fit(task, datamodule)
+```
+
+## Custom band selection
+
+Use a subset of bands:
+
+```python
+import torch
+from torchgeo.models import ResNet18_Weights
+
+weights = ResNet18_Weights.SENTINEL2_ALL_MOCO  # 13 channels
+
+# Select specific bands (e.g., RGB + NIR)
+band_indices = [2, 1, 0, 7]  # B3, B2, B1, B8
+
+# Load full weights
+state_dict = weights.get_state_dict()
+
+# Modify first conv layer
+first_conv_weight = state_dict['conv1.weight']  # (64, 13, 7, 7)
+state_dict['conv1.weight'] = first_conv_weight[:, band_indices, :, :]  # (64, 4, 7, 7)
+
+# Create model with 4 channels
+model = timm.create_model("resnet18", in_chans=4, num_classes=10)
+model.load_state_dict(state_dict, strict=False)
+```
+
+## Best practices
+
+<Tip>
+**Match sensors**: Use Sentinel-2 weights for Sentinel-2 data, Landsat weights for Landsat data, etc.
+</Tip>
+
+<Warning>
+**Channel mismatch**: Ensure `in_chans` matches `weights.meta["in_chans"]` or adapt weights for custom bands.
+</Warning>
+
+<Info>
+**Learning rate**: Use lower learning rates (1e-4 to 1e-3) when fine-tuning to preserve pre-trained features.
+</Info>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Model Architectures" icon="brain" href="/api/models/architectures">
+    Learn about available model architectures
+  </Card>
+  <Card title="Trainers" icon="graduation-cap" href="/training/trainers">
+    Use weights with TorchGeo trainers
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/models/pretrained-weights">
+    Complete weight API documentation
+  </Card>
+  <Card title="Tutorial" icon="book-open" href="/tutorials/pretrained-weights">
+    Hands-on tutorial
+  </Card>
+</CardGroup>

@@ -1,0 +1,694 @@
+---
+title: Non-Geospatial Datasets
+description: API reference for benchmark datasets without geospatial metadata
+---
+
+Non-geospatial datasets are pre-defined benchmark datasets without coordinate information. They are designed for standard computer vision tasks using PyTorch's DataLoader.
+
+## Base Classes
+
+### NonGeoDataset
+
+Abstract base class for datasets lacking geospatial information.
+
+```python
+from torchgeo.datasets import NonGeoDataset
+```
+
+**Key Features**:
+- Integer indexing (not spatial queries)
+- Pre-defined image chips
+- Compatible with PyTorch DataLoader
+- Suitable for benchmarking and competitions
+
+**Methods**:
+
+<ParamField path="__getitem__" type="(index: int) -> Sample">
+  Retrieve sample by integer index: `dataset[0]`
+</ParamField>
+
+<ParamField path="__len__" type="() -> int">
+  Return number of samples in dataset
+</ParamField>
+
+**Example**:
+```python
+from torch.utils.data import DataLoader
+
+dataset = MyNonGeoDataset(root='data', split='train')
+dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+
+for sample in dataloader:
+    image = sample['image']  # [B, C, H, W]
+    label = sample['label']  # [B]
+```
+
+---
+
+### NonGeoClassificationDataset
+
+Base class for classification datasets organized in folder structure (one folder per class).
+
+```python
+from torchgeo.datasets import NonGeoClassificationDataset
+```
+
+**Constructor**:
+
+<ParamField path="root" type="str | PathLike" default="'data'">
+  Root directory containing class subdirectories
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Transform function applied to each sample
+</ParamField>
+
+<ParamField path="loader" type="Callable[[str], Any]" default="pil_loader">
+  Function to load images from file paths
+</ParamField>
+
+<ParamField path="is_valid_file" type="Callable[[str], bool] | None" default="None">
+  Function to filter valid image files
+</ParamField>
+
+**Expected Directory Structure**:
+```
+root/
+├── class_1/
+│   ├── image1.jpg
+│   ├── image2.jpg
+│   └── ...
+├── class_2/
+│   ├── image1.jpg
+│   └── ...
+└── ...
+```
+
+**Output Format**:
+```python
+{
+    'image': Tensor,  # [C, H, W]
+    'label': Tensor   # Scalar class index
+}
+```
+
+---
+
+## Common Parameters
+
+Most non-geospatial datasets support these parameters:
+
+<ParamField path="root" type="str | PathLike" default="'data'">
+  Root directory where dataset is stored or will be downloaded
+</ParamField>
+
+<ParamField path="split" type="str" default="'train'">
+  Dataset split: typically 'train', 'val', or 'test'
+</ParamField>
+
+<ParamField path="transforms" type="Callable[[Sample], Sample] | None" default="None">
+  Transform function for data augmentation
+</ParamField>
+
+<ParamField path="download" type="bool" default="False">
+  If True, download the dataset if not found locally
+</ParamField>
+
+<ParamField path="checksum" type="bool" default="False">
+  If True, verify file integrity using MD5 checksums
+</ParamField>
+
+---
+
+## Classification Datasets
+
+Benchmark datasets for image classification tasks.
+
+### EuroSAT
+
+Sentinel-2 satellite imagery for land use classification.
+
+```python
+from torchgeo.datasets import EuroSAT
+
+dataset = EuroSAT(
+    root='data/eurosat',
+    split='train',
+    download=True
+)
+```
+
+**Properties**:
+- 27,000 labeled images
+- 13 spectral bands (Sentinel-2)
+- 64x64 pixel images
+- 10 classes: Annual Crop, Forest, Herbaceous Vegetation, Highway, Industrial, Pasture, Permanent Crop, Residential, River, Sea/Lake
+
+**Variants**:
+- `EuroSAT`: Full 13-band version
+- `EuroSAT100`: 100-sample subset for testing
+- `EuroSATSpatial`: Spatial split variant
+
+---
+
+### RESISC45
+
+High-resolution remote sensing image scene classification.
+
+```python
+from torchgeo.datasets import RESISC45
+
+dataset = RESISC45(
+    root='data/resisc45',
+    split='train',
+    download=True
+)
+```
+
+**Properties**:
+- 31,500 images
+- RGB aerial imagery
+- 256x256 pixels
+- 45 scene classes (airplane, beach, bridge, forest, etc.)
+
+---
+
+### UC Merced
+
+Land use classification from high-resolution imagery.
+
+```python
+from torchgeo.datasets import UCMerced
+
+dataset = UCMerced(
+    root='data/ucmerced',
+    download=True
+)
+```
+
+**Properties**:
+- 2,100 images
+- RGB aerial imagery
+- 256x256 pixels
+- 21 classes (agricultural, airplane, baseball diamond, beach, etc.)
+
+---
+
+### Additional Classification Datasets
+
+**Satellite Imagery**:
+- `BigEarthNet`: Large-scale Sentinel-2 benchmark (590,326 patches)
+- `BigEarthNetV2`: Updated version with corrected labels
+- `So2Sat`: Sentinel-1 & Sentinel-2 for local climate zones
+- `PatternNet`: 38-class remote sensing scene classification
+- `MillionAID`: Large-scale scene classification (1M images)
+
+**Aerial Imagery**:
+- `ADVANCE`: Aerial scene understanding
+- `AID`: Aerial Image Dataset (10,000 images, 30 classes)
+
+**Specialized**:
+- `CV4AKenyaCropType`: Crop type classification (Kenya)
+- `SouthAfricaCropType`: Crop type classification (South Africa)
+- `SSL4EOL`: Self-supervised learning benchmark
+- `TreeSatAI`: Tree species classification
+
+---
+
+## Segmentation Datasets
+
+Benchmark datasets for semantic segmentation tasks.
+
+### Inria Aerial Image Labeling
+
+Building segmentation from aerial imagery.
+
+```python
+from torchgeo.datasets import InriaAerialImageLabeling
+
+dataset = InriaAerialImageLabeling(
+    root='data/inria',
+    split='train',
+    download=True
+)
+```
+
+**Properties**:
+- RGB aerial imagery + binary building masks
+- 5000x5000 pixel tiles
+- 180 cities across the world
+- Binary segmentation (building/background)
+
+**Output Format**:
+```python
+{
+    'image': Tensor,  # [3, H, W]
+    'mask': Tensor    # [H, W] - binary mask
+}
+```
+
+---
+
+### DeepGlobe Land Cover
+
+Multi-class land cover segmentation.
+
+```python
+from torchgeo.datasets import DeepGlobeLandCover
+
+dataset = DeepGlobeLandCover(
+    root='data/deepglobe',
+    split='train',
+    download=True
+)
+```
+
+**Properties**:
+- RGB satellite imagery
+- 2448x2448 pixels
+- 7 classes: Urban, Agriculture, Rangeland, Forest, Water, Barren, Unknown
+
+---
+
+### LoveDA
+
+Urban/rural scene segmentation.
+
+```python
+from torchgeo.datasets import LoveDA
+
+dataset = LoveDA(
+    root='data/loveda',
+    split='train',
+    scene=['urban', 'rural'],
+    download=True
+)
+```
+
+**Properties**:
+- RGB imagery
+- 1024x1024 pixels
+- 7 classes: Background, Building, Road, Water, Barren, Forest, Agriculture
+- Urban and rural scenes
+
+---
+
+### Potsdam2D
+
+High-resolution urban segmentation.
+
+```python
+from torchgeo.datasets import Potsdam2D
+
+dataset = Potsdam2D(
+    root='data/potsdam',
+    split='train'
+)
+```
+
+**Properties**:
+- RGB + NIR imagery
+- 6000x6000 pixel tiles
+- 6 classes: Impervious surfaces, Building, Low vegetation, Tree, Car, Background
+
+---
+
+### Vaihingen2D
+
+High-resolution urban segmentation.
+
+```python
+from torchgeo.datasets import Vaihingen2D
+
+dataset = Vaihingen2D(
+    root='data/vaihingen',
+    split='train'
+)
+```
+
+**Properties**:
+- RGB + NIR + DSM
+- Variable image sizes
+- 6 classes: Same as Potsdam2D
+
+---
+
+### Additional Segmentation Datasets
+
+**Urban/Building**:
+- `Chesapeake`: Land cover for Chesapeake Bay watershed
+- `ChesapeakeCVPR`: Competition variant
+- `LandCoverAI`: Building/woodland/water/road segmentation
+- `SpaceNet`: Building footprint extraction (multiple challenges)
+
+**Agricultural**:
+- `PASTIS`: Panoptic segmentation of satellite image time series
+- `AgriFieldNet`: Agricultural field boundary delineation
+- `FieldsOfTheWorld`: Global field boundary dataset
+
+**Change Detection**:
+- `OSCD`: Onera Satellite Change Detection
+- `LEVIRCD`: Building change detection
+- `xBD` / `XView2`: Building damage assessment
+
+**Specialized**:
+- `SEN12MS`: Multi-modal (Sentinel-1/2, Landsat 8) segmentation
+- `DFC2022`: Data Fusion Contest 2022
+- `EnviroAtlas`: Multi-label land cover
+- `GID15`: Large-scale land cover
+
+---
+
+## Object Detection Datasets
+
+Benchmark datasets for object detection tasks.
+
+### VHR-10
+
+Very high-resolution object detection.
+
+```python
+from torchgeo.datasets import VHR10
+
+dataset = VHR10(
+    root='data/vhr10',
+    download=True
+)
+```
+
+**Properties**:
+- 800 RGB images
+- 10 classes: Airplane, Ship, Storage tank, Baseball diamond, Tennis court, Basketball court, Ground track field, Harbor, Bridge, Vehicle
+- Bounding box annotations
+
+**Output Format**:
+```python
+{
+    'image': Tensor,      # [3, H, W]
+    'bbox_xyxy': Tensor,  # [N, 4] - boxes in (xmin, ymin, xmax, ymax)
+    'label': Tensor       # [N] - class indices
+}
+```
+
+---
+
+### DIOR
+
+Object detection in optical remote sensing images.
+
+```python
+from torchgeo.datasets import DIOR
+
+dataset = DIOR(
+    root='data/dior',
+    split='train'
+)
+```
+
+**Properties**:
+- 23,463 images
+- RGB imagery
+- 800x800 pixels
+- 20 object categories
+
+---
+
+### DOTA
+
+Oriented object detection in aerial images.
+
+```python
+from torchgeo.datasets import DOTA
+
+dataset = DOTA(
+    root='data/dota',
+    split='train',
+    version='v1.0'
+)
+```
+
+**Properties**:
+- Large-scale dataset
+- Oriented bounding boxes
+- 15-18 categories (depending on version)
+- Very high resolution
+
+---
+
+### Additional Detection Datasets
+
+**Object Detection**:
+- `FAIR1M`: Fine-grained object recognition (1M instances, 37 categories)
+- `COWC`: Cars Overhead With Context
+- `NASAMarineDebris`: Marine debris detection
+- `xView`: 1M objects, 60 classes
+
+**Specialized**:
+- `RwandaFieldBoundary`: Instance segmentation of crop fields
+- `IDTReeS`: Individual tree crown detection
+
+---
+
+## Multi-Task Datasets
+
+Datasets supporting multiple task types.
+
+### BigEarthNet
+
+Large-scale multi-label classification.
+
+```python
+from torchgeo.datasets import BigEarthNet, BigEarthNetV2
+
+dataset = BigEarthNetV2(
+    root='data/bigearthnet',
+    split='train',
+    bands='s2',  # or 's1' or 'all'
+    download=True
+)
+```
+
+**Properties**:
+- 590,326 Sentinel-1 and Sentinel-2 patches
+- Multi-label classification (19 classes)
+- 120x120m patches
+- Europe coverage
+
+---
+
+### SEN12MS
+
+Multi-modal semantic segmentation.
+
+```python
+from torchgeo.datasets import SEN12MS
+
+dataset = SEN12MS(
+    root='data/sen12ms',
+    split='train',
+    sensors=['s1', 's2']  # Sentinel-1, Sentinel-2
+)
+```
+
+**Properties**:
+- 180,662 triplets (Sentinel-1, Sentinel-2, Landsat 8)
+- Global coverage
+- Land cover classification
+- Multi-modal learning
+
+---
+
+### BioMassters
+
+Biomass estimation from satellite imagery.
+
+```python
+from torchgeo.datasets import BioMassters
+
+dataset = BioMassters(
+    root='data/biomassters',
+    split='train'
+)
+```
+
+**Properties**:
+- Sentinel-1 & Sentinel-2 time series
+- Above-ground biomass regression
+- Competition dataset
+
+---
+
+## Temporal/Time Series Datasets
+
+Datasets with temporal sequences.
+
+### PASTIS
+
+Panoptic segmentation of satellite time series.
+
+```python
+from torchgeo.datasets import PASTIS
+
+dataset = PASTIS(
+    root='data/pastis',
+    split='train',
+    download=True
+)
+```
+
+**Properties**:
+- Sentinel-2 time series
+- 2,433 parcels
+- 18 crop classes
+- Temporal semantic segmentation
+
+---
+
+### CropHarvest
+
+Global crop type mapping.
+
+```python
+from torchgeo.datasets import CropHarvest
+
+dataset = CropHarvest(
+    root='data/cropharvest',
+    download=True
+)
+```
+
+**Properties**:
+- Satellite time series
+- Global coverage
+- Binary crop/non-crop classification
+
+---
+
+### SustainBench Crop Yield
+
+Crop yield prediction.
+
+```python
+from torchgeo.datasets import SustainBenchCropYield
+
+dataset = SustainBenchCropYield(
+    root='data/sustainbench',
+    split='train'
+)
+```
+
+**Properties**:
+- Satellite imagery + weather data
+- Yield regression task
+- US coverage
+
+---
+
+## Embedding Datasets
+
+Pre-computed foundation model embeddings.
+
+```python
+from torchgeo.datasets import (
+    ClayEmbeddings,           # Clay foundation model
+    PrestoEmbeddings,         # Presto foundation model  
+    SatlasPretrain,           # Satlas pretraining
+    SSLEOLBenchmark,          # SSL4EO benchmark
+    TesseraEmbeddings,        # Tessera embeddings
+    MajorTOMEmbeddings,       # MajorTOM embeddings
+    EarthEmbeddings,          # Earth observation embeddings
+    GoogleSatelliteEmbedding, # Google embeddings
+)
+
+dataset = PrestoEmbeddings(
+    root='data/presto',
+    download=True
+)
+```
+
+These datasets provide pre-computed embeddings from foundation models, useful for transfer learning and fine-tuning.
+
+---
+
+## Usage Examples
+
+### Basic Training Loop
+
+```python
+from torchgeo.datasets import EuroSAT
+from torch.utils.data import DataLoader
+import torch.nn as nn
+import torch.optim as optim
+
+# Load dataset
+train_dataset = EuroSAT(root='data', split='train', download=True)
+val_dataset = EuroSAT(root='data', split='val')
+
+# Create dataloaders
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=32)
+
+# Training
+model = MyModel()
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters())
+
+for epoch in range(num_epochs):
+    for sample in train_loader:
+        images = sample['image']
+        labels = sample['label']
+        
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+```
+
+### With Transforms
+
+```python
+import kornia.augmentation as K
+from torchgeo.transforms import AugmentationSequential
+
+transforms = AugmentationSequential(
+    K.RandomHorizontalFlip(p=0.5),
+    K.RandomVerticalFlip(p=0.5),
+    K.RandomRotation(degrees=90),
+    K.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    data_keys=['image']
+)
+
+dataset = EuroSAT(
+    root='data',
+    split='train',
+    transforms=transforms
+)
+```
+
+### Segmentation Example
+
+```python
+from torchgeo.datasets import DeepGlobeLandCover
+
+dataset = DeepGlobeLandCover(
+    root='data/deepglobe',
+    split='train',
+    transforms=transforms
+)
+
+for sample in dataset:
+    image = sample['image']  # [C, H, W]
+    mask = sample['mask']    # [H, W] with class indices
+    
+    # Your segmentation model
+    pred = model(image.unsqueeze(0))
+    loss = criterion(pred, mask.unsqueeze(0))
+```
+
+## See Also
+
+- [Geospatial Datasets](/api/datasets/geospatial) - Datasets with coordinate information
+- [Transforms](/api/transforms) - Data augmentation techniques
+- [DataModules](/api/datamodules) - Lightning DataModules for common datasets
