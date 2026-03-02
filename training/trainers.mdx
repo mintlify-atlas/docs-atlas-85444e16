@@ -218,6 +218,20 @@ task = SimCLRTask(
 )
 ```
 
+### IOBenchTask
+
+Specialized task for the IOBench benchmark:
+
+```python
+from torchgeo.trainers import IOBenchTask
+
+task = IOBenchTask(
+    model="resnet18",
+    in_channels=3,
+    lr=1e-3
+)
+```
+
 ## Common parameters
 
 All tasks support these parameters:

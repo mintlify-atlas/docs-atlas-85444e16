@@ -458,6 +458,24 @@ Self-supervised learning tasks for pre-training encoders without labels.
       Learning rate
     </ParamField>
   </Tab>
+
+  <Tab title="IOBenchTask">
+    ### IOBenchTask
+
+    Specialized task for the IOBench benchmark dataset.
+
+    <ParamField path="model" type="str" default="'resnet18'">
+      Name of the model
+    </ParamField>
+
+    <ParamField path="in_channels" type="int" default="3">
+      Number of input channels
+    </ParamField>
+
+    <ParamField path="lr" type="float" default="1e-3">
+      Learning rate
+    </ParamField>
+  </Tab>
 </Tabs>
 
 ## Complete Training Example
